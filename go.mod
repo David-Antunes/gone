@@ -12,7 +12,6 @@ require (
 require (
 	github.com/David-Antunes/xdp v1.0.0 // indirect
 	github.com/cilium/ebpf v0.16.0 // indirect
-	github.com/david-antunes/xdp v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
