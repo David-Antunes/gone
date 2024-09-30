@@ -3,13 +3,14 @@ module github.com/David-Antunes/gone
 go 1.23
 
 require (
-	github.com/David-Antunes/gone-proxy v1.0.0
+	github.com/David-Antunes/gone-proxy v1.0.1
 	github.com/neo4j/neo4j-go-driver/v5 v5.25.0
 	github.com/spf13/viper v1.19.0
 	golang.org/x/time v0.6.0
 )
 
 require (
+	github.com/David-Antunes/xdp v1.0.0 // indirect
 	github.com/cilium/ebpf v0.16.0 // indirect
 	github.com/david-antunes/xdp v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
