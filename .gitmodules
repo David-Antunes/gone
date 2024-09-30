@@ -1,0 +1,6 @@
+[submodule "gone-rtt"]
+	path = gone-rtt
+	url = https://github.com/David-Antunes/gone-rtt
+[submodule "gone-proxy"]
+	path = gone-proxy
+	url = https://github.com/David-Antunes/gone-proxy
