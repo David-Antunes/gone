@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"github.com/David-Antunes/gone/internal/network/routing"
+	"sync"
 )
 
 type Router struct {
+	sync.Mutex
 	id              string
 	channels        map[string]chan *xdp.Frame
 	incomingChannel chan *xdp.Frame
@@ -17,7 +19,16 @@ type Router struct {
 
 func CreateRouter(id string) *Router {
 
-	return &Router{id, make(map[string]chan *xdp.Frame), make(chan *xdp.Frame, queueSize), false, make(chan *xdp.Frame, queueSize), make(chan struct{})}
+	return &Router{
+		Mutex:           sync.Mutex{},
+		id:              id,
+		channels:        make(map[string]chan *xdp.Frame),
+		incomingChannel: make(chan *xdp.Frame, queueSize),
+		running:         false,
+		queue:           make(chan *xdp.Frame, queueSize),
+		ctx:             make(chan struct{}),
+	}
+	//return &Router{id, make(map[string]chan *xdp.Frame), make(chan *xdp.Frame, queueSize), false, make(chan *xdp.Frame, queueSize), make(chan struct{})}
 }
 
 func (router *Router) Incoming() chan *xdp.Frame {
@@ -35,13 +46,17 @@ func (router *Router) GetMacs() [][]byte {
 }
 
 func (router *Router) AddNode(mac []byte, channel chan *xdp.Frame) {
+	router.Lock()
 	router.channels[string(mac)] = channel
+	router.Unlock()
 }
 
 func (router *Router) RemoveNode(mac []byte) {
+	router.Lock()
 	if _, ok := router.channels[string(mac)]; ok {
 		delete(router.channels, string(mac))
 	}
+	router.Unlock()
 }
 
 func (router *Router) HasMac(mac []byte) bool {
@@ -50,7 +65,9 @@ func (router *Router) HasMac(mac []byte) bool {
 }
 
 func (router *Router) ClearRoutes() {
+	router.Lock()
 	router.channels = make(map[string]chan *xdp.Frame)
+	router.Unlock()
 }
 
 func (router *Router) Start() {
@@ -80,7 +97,7 @@ func (router *Router) receive() {
 			if len(router.queue) < queueSize {
 				router.queue <- frame
 			} else {
-				fmt.Println("Queue Full!")
+				fmt.Println(router.id, "Queue Full!")
 			}
 		}
 	}
@@ -92,21 +109,19 @@ func (router *Router) send() {
 		case <-router.ctx:
 			return
 		case frame := <-router.queue:
-			channel, ok := router.channels[frame.GetMacDestination()]
-			if !ok {
-				routing.HandleNewMac(frame, router.id)
-			} else {
+			if channel, ok := router.channels[frame.GetMacDestination()]; ok {
 				channel <- frame
+			} else {
+				routing.HandleNewMac(frame, router.id)
 			}
 		}
 	}
 }
 
 func (router *Router) InjectFrame(frame *xdp.Frame) {
-	channel, ok := router.channels[frame.GetMacDestination()]
-	if !ok {
-		routing.HandleNewMac(frame, router.id)
-	} else {
+	if channel, ok := router.channels[frame.GetMacDestination()]; ok {
 		channel <- frame
+	} else {
+		routing.HandleNewMac(frame, router.id)
 	}
 }

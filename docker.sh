@@ -20,19 +20,22 @@ if [[ ! $LOCAL_IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 
-docker kill $(docker ps -q --filter "network=net")
+
+docker unpause $(docker ps -q --filter "network=gone_net")
+docker kill $(docker ps -q --filter "network=gone_net")
 
 docker kill proxy-$(hostname)
 docker kill gone-$(hostname)
+docker kill rtt-$(hostname)
 
 docker rm rtt-$(hostname)
 docker rm proxy-$(hostname)
 docker rm gone-$(hostname)
 
 
-NETWORK_ID=$(docker network list -f "name=net" --format "{{.ID}}")
+NETWORK_ID=$(docker network list -f "name=gone_net" --format "{{.ID}}")
 
-docker run -d --name rtt-$(hostname) --network net gone-rtt
+docker run -d --name rtt-$(hostname) --network gone_net gone-rtt
 
 docker run -d --privileged --network none --name proxy-$(hostname) -v /var/run/docker:/var/run/docker -v /tmp:/tmp -e NETWORK=$NETWORK_ID gone-proxy
 

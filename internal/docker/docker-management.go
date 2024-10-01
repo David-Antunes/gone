@@ -20,13 +20,15 @@ type dockerNode struct {
 
 type DockerManager struct {
 	machineId string
+	ns        string
 	proxy     *proxy.ProxyServer
 	nodes     map[string]dockerNode
 }
 
-func CreateDockerManager(id string, proxyServer *proxy.ProxyServer) *DockerManager {
+func CreateDockerManager(id string, proxyServer *proxy.ProxyServer, ns string) *DockerManager {
 	return &DockerManager{
 		machineId: id,
+		ns:        ns,
 		proxy:     proxyServer,
 		nodes:     make(map[string]dockerNode),
 	}
@@ -49,6 +51,21 @@ func (d *DockerManager) RegisterContainer(machineId string, id string, mac strin
 		ip:        ip,
 	}
 	return nil
+}
+
+func (d *DockerManager) checkNS(id string) bool {
+	shell := exec.Command("docker", "inspect", id, "--format", "{{.HostConfig.NetworkMode}}")
+	out, err := shell.Output()
+	if err != nil {
+		return false
+	}
+	ns := strings.Trim(string(out), " ")
+	ns = strings.Trim(ns, "\n")
+	if ns == d.ns {
+		return true
+	} else {
+		return false
+	}
 }
 
 // return uniqId, macAddress, ipAddr, nil
@@ -74,10 +91,16 @@ func (d *DockerManager) ExecContainer(dockerCmd string) (string, string, string,
 		return "", "", "", err
 	}
 
+	if !d.checkNS(containerId) {
+		dockerLog.Println("container not created in the appropriate network")
+		ClearContainer(containerId)
+		return "", "", "", errors.New("container not created in the appropriate network")
+	}
+
 	err = d.proxy.Refresh()
 	if err != nil {
 		dockerLog.Println("Could not refresh proxy", err)
-		//return "", "", "", err
+		return "", "", "", err
 	}
 
 	shell = exec.Command("docker", "inspect", containerId, "--format", "{{.NetworkSettings.Networks.net.MacAddress}}")

@@ -7,6 +7,7 @@ import (
 	"github.com/David-Antunes/gone/internal/network"
 	"github.com/David-Antunes/gone/internal/proxy"
 	"strconv"
+	"sync"
 )
 
 type LocalFlowManager interface {
@@ -23,6 +24,7 @@ type RemoteFlowManager interface {
 	GetMacChannel() chan *xdp.Frame
 }
 type Topology struct {
+	sync.Mutex
 	machineId string
 	nodes     map[string]*Node
 	macs      map[string]*Node
@@ -35,6 +37,7 @@ type Topology struct {
 
 func CreateTopology(machineId string, fl LocalFlowManager, delay *network.DynamicDelay) *Topology {
 	return &Topology{
+		Mutex:     sync.Mutex{},
 		machineId: machineId,
 		nodes:     make(map[string]*Node),
 		macs:      make(map[string]*Node),
@@ -352,6 +355,7 @@ func (topo *Topology) ConnectRouterToRouterLocal(router1 string, router2 string,
 	return link, nil
 }
 func (topo *Topology) InsertNewPath(path []string, frame *xdp.Frame, distance int) {
+	topo.Lock()
 	currDistance := distance
 	router1 := topo.routers[path[0]]
 
@@ -367,6 +371,7 @@ func (topo *Topology) InsertNewPath(path []string, frame *xdp.Frame, distance in
 		}
 		router1 = router2
 	}
+	topo.Unlock()
 }
 
 func (topo *Topology) RemoveNode(nodeId string) (*Node, error) {

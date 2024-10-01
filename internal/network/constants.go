@@ -6,7 +6,6 @@ const queueSize = 10000000
 const packetSize = 1500
 
 var nullChan = make(chan *xdp.Frame, queueSize)
-var outChan chan *xdp.Frame
 
 func GetNullChan() chan *xdp.Frame {
 	return nullChan
@@ -19,6 +18,5 @@ func ClearNullChan() {
 		}
 	}
 }
-func SetOutChan(channel chan *xdp.Frame) {
-	outChan = channel
-}
+
+var broadcastAddr = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}

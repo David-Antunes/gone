@@ -43,9 +43,6 @@ func cleanup() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		if profiler {
-			pprof.StopCPUProfile()
-		}
 		os.Exit(0)
 	}()
 }
@@ -69,6 +66,7 @@ func setEnvVariables() {
 	viper.SetDefault("PROXY_RTT_SOCKET", "/tmp/proxy-rtt.sock")
 	viper.SetDefault("PROXY_SERVER", "/tmp/proxy-server.sock")
 	viper.SetDefault("PROXY_RTT_UPDATE_MS", 60000)
+	viper.SetDefault("NETWORK_NAMESPACE", "gone_net")
 	viper.SetConfigType("env")
 	err := viper.WriteConfigAs(".env")
 	if err != nil {
@@ -90,25 +88,12 @@ func printVariables() {
 	}
 }
 
-var profiler = true
-
 func main() {
 
 	// Read environment variables from .env
 	setEnvVariables()
 	viper.AutomaticEnv()
 	printVariables()
-
-	if profiler {
-		f, err := os.Create("profiler.prof")
-		if err != nil {
-			panic(err)
-		}
-		err = pprof.StartCPUProfile(f)
-		if err != nil {
-			panic(err)
-		}
-	}
 
 	rttSocket, err := net.Dial("unix", viper.GetString("PROXY_RTT_SOCKET"))
 	if err != nil {
@@ -148,9 +133,11 @@ func main() {
 	icm.SetConnection(r)
 	icm.Start()
 
+	d := docker.CreateDockerManager(id, proxyServer, viper.GetString("NETWORK_NAMESPACE"))
+
 	// Setup channel to send to proxy
 	if p != 0 {
-		app := application.NewLeader(cl, docker.CreateDockerManager(id, proxyServer), prox, icm, rtt)
+		app := application.NewLeader(cl, d, prox, icm, rtt)
 		routing.SetRouting(app)
 
 		leader.StartDaemon(app, cd, "0.0.0.0:"+serverPort)
@@ -159,7 +146,7 @@ func main() {
 		cl.JoinMembership(primaryAddr+":"+primaryPort, id, serverIP+":"+serverPort, serverIP+":"+framePort)
 		fmt.Println("Contacted Main Node")
 
-		app := application.NewFollower(cl, docker.CreateDockerManager(id, proxyServer), prox, icm, rtt)
+		app := application.NewFollower(cl, d, prox, icm, rtt)
 		routing.SetRouting(app)
 
 		follower.StartDaemon(app, cd, "0.0.0.0:"+serverPort)

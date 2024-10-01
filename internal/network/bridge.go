@@ -1,11 +1,14 @@
 package network
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"sync"
 )
 
 type Bridge struct {
+	sync.Mutex
 	channels        map[string]chan *xdp.Frame
 	incomingChannel chan *xdp.Frame
 	gateway         chan *xdp.Frame
@@ -16,7 +19,17 @@ type Bridge struct {
 }
 
 func CreateBridge() *Bridge {
-	return &Bridge{make(map[string]chan *xdp.Frame), make(chan *xdp.Frame, queueSize), nil, nil, false, make(chan *xdp.Frame, queueSize), make(chan struct{})}
+	return &Bridge{
+		Mutex:           sync.Mutex{},
+		channels:        make(map[string]chan *xdp.Frame),
+		incomingChannel: make(chan *xdp.Frame, queueSize),
+		gateway:         nil,
+		link:            nil,
+		running:         false,
+		queue:           make(chan *xdp.Frame, queueSize),
+		ctx:             make(chan struct{}),
+	}
+	//return &Bridge{make(map[string]chan *xdp.Frame), make(chan *xdp.Frame, queueSize), nil, nil, false, make(chan *xdp.Frame, queueSize), make(chan struct{})}
 }
 
 func (bridge *Bridge) Gateway() chan *xdp.Frame {
@@ -40,21 +53,27 @@ func (bridge *Bridge) Link() *BiLink {
 }
 
 func (bridge *Bridge) GetMacs() [][]byte {
+	bridge.Lock()
 	macs := make([][]byte, 0, len(bridge.channels))
 
 	for key := range bridge.channels {
 		macs = append(macs, []byte(key))
 	}
 
+	bridge.Unlock()
 	return macs
 }
 
 func (bridge *Bridge) AddNode(mac []byte, channel chan *xdp.Frame) {
+	bridge.Lock()
 	bridge.channels[string(mac)] = channel
+	bridge.Unlock()
 }
 
 func (bridge *Bridge) RemoveNode(mac []byte) {
+	bridge.Lock()
 	delete(bridge.channels, string(mac))
+	bridge.Unlock()
 }
 
 func (bridge *Bridge) Start() {
@@ -98,9 +117,16 @@ func (bridge *Bridge) send() {
 			return
 
 		case frame := <-bridge.queue:
+			if bytes.Equal([]byte(frame.MacDestination), broadcastAddr) {
+				bridge.Lock()
+				for _, channel := range bridge.channels {
+					channel <- frame
+				}
+				bridge.Unlock()
+				continue
+			}
 
-			channel, ok := bridge.channels[frame.GetMacDestination()]
-			if ok {
+			if channel, ok := bridge.channels[frame.GetMacDestination()]; ok {
 				channel <- frame
 			} else {
 				bridge.gateway <- frame
