@@ -113,7 +113,7 @@ func (app *Leader) HandleNewMac(frame *xdp.Frame, routerId string) {
 	}
 }
 
-func (app *Leader) execInMachine(machineId string, dockerCmd string) (string, string, string, error) {
+func (app *Leader) execInMachine(machineId string, dockerCmd []string) (string, string, string, error) {
 	body := &api.AddNodeRequest{
 		DockerCmd: dockerCmd,
 		MachineId: machineId,
@@ -140,7 +140,7 @@ func (app *Leader) execInMachine(machineId string, dockerCmd string) (string, st
 	return result.Id, result.Mac, result.Ip, err
 }
 
-func (app *Leader) AddNode(machineId string, dockerCmd string) (string, string, string, error) {
+func (app *Leader) AddNode(machineId string, dockerCmd []string) (string, string, string, error) {
 	if !app.cl.Contains(machineId) {
 		return "", "", "", errors.New("invalid machine id")
 	}

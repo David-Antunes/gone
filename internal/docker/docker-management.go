@@ -69,10 +69,10 @@ func (d *DockerManager) checkNS(id string) bool {
 }
 
 // return uniqId, macAddress, ipAddr, nil
-func (d *DockerManager) ExecContainer(dockerCmd string) (string, string, string, error) {
+func (d *DockerManager) ExecContainer(dockerCmd []string) (string, string, string, error) {
 
-	cmd := strings.Split(dockerCmd, " ")
-	shell := exec.Command(cmd[0], cmd[1:]...)
+	dockerLog.Println(dockerCmd)
+	shell := exec.Command(dockerCmd[0], dockerCmd[1:]...)
 	out, err := shell.Output()
 	if err != nil {
 		dockerLog.Println("Could not execute docker run.", err)
@@ -103,7 +103,7 @@ func (d *DockerManager) ExecContainer(dockerCmd string) (string, string, string,
 		return "", "", "", err
 	}
 
-	shell = exec.Command("docker", "inspect", containerId, "--format", "{{.NetworkSettings.Networks.net.MacAddress}}")
+	shell = exec.Command("docker", "inspect", containerId, "--format", "{{.NetworkSettings.Networks."+d.ns+".MacAddress}}")
 	out, err = shell.Output()
 	if err != nil {
 		dockerLog.Println("Could not fetch container Mac Address", err)
@@ -113,7 +113,7 @@ func (d *DockerManager) ExecContainer(dockerCmd string) (string, string, string,
 	macAddress := strings.Trim(string(out), " ")
 	macAddress = strings.Trim(macAddress, "\n")
 
-	shell = exec.Command("docker", "inspect", containerId, "--format", "{{.NetworkSettings.Networks.net.IPAddress}}")
+	shell = exec.Command("docker", "inspect", containerId, "--format", "{{.NetworkSettings.Networks."+d.ns+".IPAddress}}")
 	out, err = shell.Output()
 	if err != nil {
 		dockerLog.Println("Could not fetch container Ip Address", err)

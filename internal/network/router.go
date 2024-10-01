@@ -8,7 +8,7 @@ import (
 )
 
 type Router struct {
-	sync.Mutex
+	sync.RWMutex
 	id              string
 	channels        map[string]chan *xdp.Frame
 	incomingChannel chan *xdp.Frame
@@ -20,7 +20,7 @@ type Router struct {
 func CreateRouter(id string) *Router {
 
 	return &Router{
-		Mutex:           sync.Mutex{},
+		RWMutex:         sync.RWMutex{},
 		id:              id,
 		channels:        make(map[string]chan *xdp.Frame),
 		incomingChannel: make(chan *xdp.Frame, queueSize),
@@ -28,7 +28,6 @@ func CreateRouter(id string) *Router {
 		queue:           make(chan *xdp.Frame, queueSize),
 		ctx:             make(chan struct{}),
 	}
-	//return &Router{id, make(map[string]chan *xdp.Frame), make(chan *xdp.Frame, queueSize), false, make(chan *xdp.Frame, queueSize), make(chan struct{})}
 }
 
 func (router *Router) Incoming() chan *xdp.Frame {
@@ -36,12 +35,14 @@ func (router *Router) Incoming() chan *xdp.Frame {
 }
 
 func (router *Router) GetMacs() [][]byte {
+	router.RLock()
 	macs := make([][]byte, 0, len(router.channels))
 
 	for key := range router.channels {
 		macs = append(macs, []byte(key))
 	}
 
+	router.RUnlock()
 	return macs
 }
 
@@ -60,7 +61,9 @@ func (router *Router) RemoveNode(mac []byte) {
 }
 
 func (router *Router) HasMac(mac []byte) bool {
+	router.RLock()
 	_, ok := router.channels[string(mac)]
+	router.RUnlock()
 	return ok
 }
 
@@ -109,9 +112,12 @@ func (router *Router) send() {
 		case <-router.ctx:
 			return
 		case frame := <-router.queue:
+			router.RLock()
 			if channel, ok := router.channels[frame.GetMacDestination()]; ok {
 				channel <- frame
+				router.RUnlock()
 			} else {
+				router.RUnlock()
 				routing.HandleNewMac(frame, router.id)
 			}
 		}
@@ -119,9 +125,12 @@ func (router *Router) send() {
 }
 
 func (router *Router) InjectFrame(frame *xdp.Frame) {
+	router.RLock()
 	if channel, ok := router.channels[frame.GetMacDestination()]; ok {
 		channel <- frame
+		router.RUnlock()
 	} else {
+		router.RUnlock()
 		routing.HandleNewMac(frame, router.id)
 	}
 }

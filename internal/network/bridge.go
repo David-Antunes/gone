@@ -8,7 +8,7 @@ import (
 )
 
 type Bridge struct {
-	sync.Mutex
+	sync.RWMutex
 	channels        map[string]chan *xdp.Frame
 	incomingChannel chan *xdp.Frame
 	gateway         chan *xdp.Frame
@@ -20,7 +20,7 @@ type Bridge struct {
 
 func CreateBridge() *Bridge {
 	return &Bridge{
-		Mutex:           sync.Mutex{},
+		RWMutex:         sync.RWMutex{},
 		channels:        make(map[string]chan *xdp.Frame),
 		incomingChannel: make(chan *xdp.Frame, queueSize),
 		gateway:         nil,
@@ -53,14 +53,14 @@ func (bridge *Bridge) Link() *BiLink {
 }
 
 func (bridge *Bridge) GetMacs() [][]byte {
-	bridge.Lock()
+	bridge.RLock()
 	macs := make([][]byte, 0, len(bridge.channels))
 
 	for key := range bridge.channels {
 		macs = append(macs, []byte(key))
 	}
 
-	bridge.Unlock()
+	bridge.RUnlock()
 	return macs
 }
 
@@ -118,19 +118,20 @@ func (bridge *Bridge) send() {
 
 		case frame := <-bridge.queue:
 			if bytes.Equal([]byte(frame.MacDestination), broadcastAddr) {
-				bridge.Lock()
+				bridge.RLock()
 				for _, channel := range bridge.channels {
 					channel <- frame
 				}
-				bridge.Unlock()
+				bridge.RUnlock()
 				continue
 			}
-
+			bridge.RLock()
 			if channel, ok := bridge.channels[frame.GetMacDestination()]; ok {
 				channel <- frame
 			} else {
 				bridge.gateway <- frame
 			}
+			bridge.RUnlock()
 		}
 	}
 }

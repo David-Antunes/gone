@@ -108,7 +108,7 @@ func (app *Follower) HandleNewMac(frame *xdp.Frame, routerId string) {
 	}
 }
 
-func (app *Follower) execInMachine(machineId string, dockerCmd string) (string, string, string, error) {
+func (app *Follower) execInMachine(machineId string, dockerCmd []string) (string, string, string, error) {
 	body := &api.AddNodeRequest{
 		DockerCmd: dockerCmd,
 		MachineId: machineId,
@@ -136,7 +136,7 @@ func (app *Follower) execInMachine(machineId string, dockerCmd string) (string, 
 
 }
 
-func (app *Follower) AddNode(machineId string, dockerCmd string) (string, string, string, error) {
+func (app *Follower) AddNode(machineId string, dockerCmd []string) (string, string, string, error) {
 	if !app.cl.Contains(machineId) {
 		return "", "", "", errors.New("invalid machine id")
 	}
