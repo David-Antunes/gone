@@ -72,6 +72,9 @@ func createDaemon(app *application.Follower, cd *cluster.ClusterDaemon, ipAddr s
 	m.HandleFunc("/stopInterceptRouters", stopInterceptRouters)
 	m.HandleFunc("/listIntercepts", listIntercepts)
 
+	m.HandleFunc("/pause", pause)
+	m.HandleFunc("/unpause", unpause)
+
 	m.HandleFunc("/registerClusterNode", cd.RegisterClusterNode)
 
 	httpServer := http.Server{

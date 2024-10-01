@@ -13,7 +13,7 @@ import (
 	"github.com/David-Antunes/gone/internal/graphDB"
 	"github.com/David-Antunes/gone/internal/network"
 	"github.com/David-Antunes/gone/internal/proxy"
-	redirect_traffic "github.com/David-Antunes/gone/internal/redirect-traffic"
+	redirecttraffic "github.com/David-Antunes/gone/internal/redirect-traffic"
 	"github.com/David-Antunes/gone/internal/topology"
 	"net"
 	"net/http"
@@ -28,8 +28,8 @@ type Follower struct {
 	topo       *topology.Topology
 	icm        *cluster.InterCommunicationManager
 	rm         *RttManager
-	sniffers   map[string]*redirect_traffic.RedirectionSocket
-	intercepts map[string]*redirect_traffic.RedirectionSocket
+	sniffers   map[string]*redirecttraffic.RedirectionSocket
+	intercepts map[string]*redirecttraffic.RedirectionSocket
 }
 
 func NewFollower(cl *cluster.Cluster, dm *docker.DockerManager, proxy *proxy.Proxy, icm *cluster.InterCommunicationManager, rm *RttManager) *Follower {
@@ -40,8 +40,8 @@ func NewFollower(cl *cluster.Cluster, dm *docker.DockerManager, proxy *proxy.Pro
 		topo:       topology.CreateTopology(dm.GetMachineId(), proxy, rm.GetRtt()),
 		icm:        icm,
 		rm:         rm,
-		sniffers:   make(map[string]*redirect_traffic.RedirectionSocket),
-		intercepts: make(map[string]*redirect_traffic.RedirectionSocket),
+		sniffers:   make(map[string]*redirecttraffic.RedirectionSocket),
+		intercepts: make(map[string]*redirecttraffic.RedirectionSocket),
 	}
 }
 
@@ -869,7 +869,7 @@ func (app *Follower) StopSniffNode(id string) error {
 	}
 
 	if n.MachineId == app.GetMachineId() {
-		var redirect *redirect_traffic.RedirectionSocket
+		var redirect *redirecttraffic.RedirectionSocket
 		if redirect, ok = app.sniffers[id]; !ok {
 			return errors.New("not sniffing traffic in this node")
 		}
@@ -929,7 +929,7 @@ func (app *Follower) StopSniffBridge(id string) error {
 	}
 
 	if b.MachineId == app.GetMachineId() {
-		var redirect *redirect_traffic.RedirectionSocket
+		var redirect *redirecttraffic.RedirectionSocket
 		if redirect, ok = app.sniffers[id]; !ok {
 			return errors.New("not sniffing traffic in this bridge")
 		}
@@ -1002,7 +1002,7 @@ func (app *Follower) StopSniffRouters(id string) error {
 
 	if r1.MachineId == app.GetMachineId() {
 		if r2.MachineId == app.GetMachineId() {
-			var redirect *redirect_traffic.RedirectionSocket
+			var redirect *redirecttraffic.RedirectionSocket
 			if redirect, ok = app.sniffers[r1.ID()+"-"+r2.ID()]; !ok {
 				return errors.New("not sniffing traffic between" + r1.ID() + " and " + r2.ID())
 
@@ -1081,7 +1081,7 @@ func (app *Follower) SniffNode(id string) (string, string, string, error) {
 		if _, ok = app.sniffers[id]; ok {
 			return "", "", "", errors.New("Already sniffing" + id)
 		}
-		redirect, err := redirect_traffic.NewRedirectionSocket(id, sniffSocketPath(id))
+		redirect, err := redirecttraffic.NewRedirectionSocket(id, sniffSocketPath(id))
 		if err != nil {
 			return "", "", "", err
 
@@ -1153,7 +1153,7 @@ func (app *Follower) SniffBridge(id string) (string, string, string, error) {
 			return "", "", "", errors.New("already performing an operation on this link")
 		}
 
-		redirect, err := redirect_traffic.NewRedirectionSocket(id, sniffSocketPath(id))
+		redirect, err := redirecttraffic.NewRedirectionSocket(id, sniffSocketPath(id))
 		if err != nil {
 			return "", "", "", err
 
@@ -1231,7 +1231,7 @@ func (app *Follower) SniffRouters(router1 string, router2 string) (string, strin
 				return "", "", "", errors.New("already performing an operation on this link")
 			}
 
-			redirect, err := redirect_traffic.NewRedirectionSocket(router1+"-"+router2, sniffSocketPath(router1+"-"+router2))
+			redirect, err := redirecttraffic.NewRedirectionSocket(router1+"-"+router2, sniffSocketPath(router1+"-"+router2))
 			if err != nil {
 				return "", "", "", err
 
@@ -1308,7 +1308,7 @@ func (app *Follower) InterceptNode(id string, direction bool) (string, string, s
 			return "", "", "", errors.New("already performing an operation on this link")
 		}
 
-		redirect, err := redirect_traffic.NewRedirectionSocket(interceptId, interceptSocketPath(interceptId))
+		redirect, err := redirecttraffic.NewRedirectionSocket(interceptId, interceptSocketPath(interceptId))
 		if err != nil {
 			return "", "", "", err
 
@@ -1377,7 +1377,7 @@ func (app *Follower) InterceptBridge(id string, direction bool) (string, string,
 			return "", "", "", errors.New(id + "is not connected to any router")
 		}
 
-		redirect, err := redirect_traffic.NewRedirectionSocket(interceptId, interceptSocketPath(interceptId))
+		redirect, err := redirecttraffic.NewRedirectionSocket(interceptId, interceptSocketPath(interceptId))
 		if err != nil {
 			return "", "", "", err
 
@@ -1458,7 +1458,7 @@ func (app *Follower) InterceptRouters(router1 string, router2 string, direction 
 
 			interceptId := getInterceptId(router1+"-"+router2, direction)
 
-			redirect, err := redirect_traffic.NewRedirectionSocket(interceptId, interceptSocketPath(interceptId))
+			redirect, err := redirecttraffic.NewRedirectionSocket(interceptId, interceptSocketPath(interceptId))
 			if err != nil {
 				return "", "", "", err
 
@@ -1526,7 +1526,7 @@ func (app *Follower) StopInterceptNode(id string, direction bool) error {
 	}
 
 	if n.MachineId == app.GetMachineId() {
-		var redirect *redirect_traffic.RedirectionSocket
+		var redirect *redirecttraffic.RedirectionSocket
 		if redirect, ok = app.intercepts[getInterceptId(id, direction)]; !ok {
 			return errors.New("not intercepting traffic in this node")
 		}
@@ -1590,7 +1590,7 @@ func (app *Follower) StopInterceptBridge(id string, direction bool) error {
 	}
 
 	if b.MachineId == app.GetMachineId() {
-		var redirect *redirect_traffic.RedirectionSocket
+		var redirect *redirecttraffic.RedirectionSocket
 		if redirect, ok = app.intercepts[getInterceptId(id, direction)]; !ok {
 			return errors.New("not intercepting traffic in this bridge")
 		}
@@ -1669,7 +1669,7 @@ func (app *Follower) StopInterceptRouters(id string, direction bool) error {
 
 	if r1.MachineId == app.GetMachineId() {
 		if r2.MachineId == app.GetMachineId() {
-			var redirect *redirect_traffic.RedirectionSocket
+			var redirect *redirecttraffic.RedirectionSocket
 			if redirect, ok = app.intercepts[getInterceptId(r1.ID()+"-"+r2.ID(), direction)]; !ok {
 				return errors.New("not intercepting traffic between" + r1.ID() + " and " + r2.ID())
 
@@ -1749,4 +1749,52 @@ func (app *Follower) ListIntercepts() []string {
 
 	return ids
 
+}
+func (app *Follower) Pause(id string, all bool) error {
+	if all {
+		app.dm.PauseAll()
+		_, err := app.cl.Broadcast(&opApi.PauseRequest{
+			Id:  "",
+			All: true,
+		}, http.MethodPost, "pause")
+		return err
+	} else {
+		if n, ok := app.topo.GetNode(id); ok {
+			if n.MachineId == app.GetMachineId() {
+				return app.dm.Pause(id)
+			} else {
+				_, err := app.cl.SendMsg(n.MachineId, &opApi.PauseRequest{
+					Id:  id,
+					All: false,
+				}, "pause")
+				return err
+			}
+		} else {
+			return errors.New("invalid node id")
+		}
+	}
+}
+func (app *Follower) Unpause(id string, all bool) error {
+	if all {
+		app.dm.UnpauseAll()
+		_, err := app.cl.Broadcast(&opApi.UnpauseRequest{
+			Id:  "",
+			All: true,
+		}, http.MethodPost, "unpause")
+		return err
+	} else {
+		if n, ok := app.topo.GetNode(id); ok {
+			if n.MachineId == app.GetMachineId() {
+				return app.dm.Unpause(id)
+			} else {
+				_, err := app.cl.SendMsg(n.MachineId, &opApi.UnpauseRequest{
+					Id:  id,
+					All: false,
+				}, "unpause")
+				return err
+			}
+		} else {
+			return errors.New("invalid node id")
+		}
+	}
 }

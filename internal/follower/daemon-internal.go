@@ -589,3 +589,78 @@ func listIntercepts(w http.ResponseWriter, r *http.Request) {
 		Sniffers: ids,
 	})
 }
+func pause(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.PauseRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("pause:", err)
+		daemon.SendError(w, &opApi.PauseResponse{
+			Id:  req.Id,
+			All: req.All,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.Pause(req.Id, req.All)
+
+	if err != nil {
+		daemonLog.Println("pause:", err)
+		daemon.SendError(w, &opApi.PauseResponse{
+			Id:  req.Id,
+			All: req.All,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.PauseResponse{
+		Id:    req.Id,
+		All:   req.All,
+		Error: apiErrors.Error{},
+	})
+
+}
+func unpause(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.UnpauseRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("unpause:", err)
+		daemon.SendError(w, &opApi.UnpauseResponse{
+			Id:  req.Id,
+			All: req.All,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.Unpause(req.Id, req.All)
+
+	if err != nil {
+		daemonLog.Println("unpause:", err)
+		daemon.SendError(w, &opApi.UnpauseResponse{
+			Id:  req.Id,
+			All: req.All,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.UnpauseResponse{
+		Id:    req.Id,
+		All:   req.All,
+		Error: apiErrors.Error{},
+	})
+}

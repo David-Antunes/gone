@@ -216,14 +216,14 @@ func (d *DockerManager) BootstrapContainer(id string) error {
 		}
 	}
 
-	shell = exec.Command("docker", "unpause", id)
-	_, err = shell.Output()
-
-	if err != nil {
-		dockerLog.Println("Could not unpause container", err)
-		ClearContainer(id)
-		return err
-	}
+	//shell = exec.Command("docker", "unpause", id)
+	//_, err = shell.Output()
+	//
+	//if err != nil {
+	//	dockerLog.Println("Could not unpause container", err)
+	//	ClearContainer(id)
+	//	return err
+	//}
 	return nil
 }
 
@@ -254,4 +254,52 @@ func (d *DockerManager) RemoveNode(id string) error {
 		return err
 	}
 	return nil
+}
+
+func (d *DockerManager) Unpause(id string) error {
+	if _, ok := d.nodes[id]; !ok {
+		return errors.New("container not found")
+	}
+
+	shell := exec.Command("docker", "unpause", id)
+	_, err := shell.Output()
+
+	if err != nil {
+		dockerLog.Println("Could not unpause container", err)
+		return err
+	}
+	return nil
+
+}
+
+func (d *DockerManager) Pause(id string) error {
+
+	if _, ok := d.nodes[id]; !ok {
+		return errors.New("container not found")
+	}
+
+	shell := exec.Command("docker", "pause", id)
+	_, err := shell.Output()
+
+	if err != nil {
+		dockerLog.Println("Could not pause container", err)
+		return err
+	}
+	return nil
+}
+func (d *DockerManager) PauseAll() {
+
+	for _, node := range d.nodes {
+		if node.machineId == d.GetMachineId() {
+			exec.Command("docker", "pause", node.id).Output()
+		}
+	}
+}
+func (d *DockerManager) UnpauseAll() {
+
+	for _, node := range d.nodes {
+		if node.machineId == d.GetMachineId() {
+			exec.Command("docker", "unpause", node.id).Output()
+		}
+	}
 }
