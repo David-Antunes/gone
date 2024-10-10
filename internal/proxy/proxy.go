@@ -4,10 +4,14 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"log"
 	"net"
+	"os"
 	"sync"
 	"time"
 )
+
+var proxyLog = log.New(os.Stdout, "PROXY INFO: ", log.Ltime)
 
 type Proxy struct {
 	sync.Mutex
@@ -49,8 +53,8 @@ func (p *Proxy) AddMac(mac []byte, incoming chan *xdp.Frame, outgoing chan *xdp.
 	p.outgoing[string(mac)] = outgoing
 	p.Unlock()
 
-	go receive(dec, incoming)
-	go send(enc, outgoing)
+	go receive(string(mac), dec, incoming)
+	go send(string(mac), enc, outgoing)
 }
 
 func (p *Proxy) RemoveMac(mac []byte) {
@@ -61,16 +65,16 @@ func (p *Proxy) RemoveMac(mac []byte) {
 	p.Unlock()
 }
 
-func receive(dec *gob.Decoder, incoming chan *xdp.Frame) {
+func receive(mac string, dec *gob.Decoder, incoming chan *xdp.Frame) {
 
 	for {
 		var frame *xdp.Frame
 
 		err := dec.Decode(&frame)
 		if err != nil {
-			panic(err)
+			proxyLog.Println(mac+":", err)
+			return
 		}
-		//fmt.Println(net.HardwareAddr(frame.MacDestination), net.HardwareAddr(frame.MacOrigin))
 		if len(incoming) < queueSize {
 			frame.Time = frame.Time.Add(-time.Now().Sub(frame.Time))
 			incoming <- frame
@@ -80,16 +84,15 @@ func receive(dec *gob.Decoder, incoming chan *xdp.Frame) {
 	}
 }
 
-func send(enc *gob.Encoder, outgoing chan *xdp.Frame) {
+func send(mac string, enc *gob.Encoder, outgoing chan *xdp.Frame) {
 	for {
 		select {
 		case frame := <-outgoing:
 			err := enc.Encode(&frame)
 			if err != nil {
-				panic(err)
-
+				proxyLog.Println(mac+":", err)
+				return
 			}
-			//fmt.Println(net.HardwareAddr(frame.MacDestination), net.HardwareAddr(frame.MacOrigin))
 		}
 	}
 }
