@@ -54,7 +54,7 @@ func setEnvVariables() {
 	viper.SetDefault("GRAPHDB", "localhost")
 	viper.SetDefault("GRAPHDB_USER", "")
 	viper.SetDefault("GRAPHDB_PASSWORD", "")
-	viper.SetDefault("ID", "primary")
+	viper.SetDefault("ID", "gone")
 	viper.SetDefault("PRIMARY", 0)
 	viper.SetDefault("PRIMARY_SERVER_IP", "192.168.1.1")
 	viper.SetDefault("PRIMARY_SERVER_PORT", "3000")
