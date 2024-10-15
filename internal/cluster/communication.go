@@ -6,7 +6,6 @@ import (
 	"github.com/David-Antunes/gone/internal/network"
 	"net"
 	"sync"
-	"time"
 )
 
 type InterCommunicationManager struct {
@@ -106,13 +105,10 @@ func (icm *InterCommunicationManager) receive(conn net.Conn) {
 	dec := gob.NewDecoder(conn)
 	for {
 		var frame *network.RouterFrame
-		//fmt.Println(time.Now(), "Receiving to cluster")
-		time.Sleep(time.Millisecond)
 		err := dec.Decode(&frame)
 		if err != nil {
 			panic(err)
 		}
-		//fmt.Println(time.Now(), "received to cluster", net.HardwareAddr(frame.Frame.MacDestination))
 
 		if len(icm.inQueue) < queueSize {
 			icm.inQueue <- frame
@@ -129,9 +125,7 @@ func (icm *InterCommunicationManager) send() {
 			icm.Lock()
 			conn, ok := icm.connections[frame.To]
 			if ok {
-				//fmt.Println(time.Now(), "sending to cluster", net.HardwareAddr(frame.Frame.MacDestination))
 				err := conn.Encode(&frame)
-				//fmt.Println(time.Now(), "Sent to cluster")
 				if err != nil {
 					panic(err)
 				}

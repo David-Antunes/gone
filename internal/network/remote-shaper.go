@@ -118,6 +118,7 @@ func (shaper *RemoteShaper) send() {
 			}
 			go func() {
 				time.Sleep(time.Until(frame.Time))
+				fmt.Println(frame.Time)
 				if len(shaper.outgoing) < queueSize {
 					shaper.outgoing <- &RouterFrame{
 						To:    shaper.to,

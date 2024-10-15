@@ -18,7 +18,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 )
 
 type Follower struct {
@@ -292,9 +291,7 @@ func (app *Follower) ConnectRouterToRouterLocally(router1ID string, router2ID st
 	if err != nil {
 		return err
 	}
-	ms := int64(linkProps.Latency / time.Millisecond)
-	graphDB.AddPath(router1ID, router2ID, link.ID(), int(ms))
-	//app.TradeRoutes(r1, r2)
+	graphDB.AddPath(router1ID, router2ID, link.ID(), linkProps.Weight)
 	app.PropagateNewRoutes(r1)
 	return nil
 }
@@ -323,7 +320,7 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 
 	r2, _ = app.topo.GetRouter(router2ID)
 
-	router1Channel := make(chan *xdp.Frame, 1000)
+	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
 	conn := app.cl.Endpoints[r2.MachineId]
 	app.icm.AddConnection(r2.ID(), conn, r1.ID(), r1.NetworkRouter)
 	toLink := network.CreateLink(router1Channel, nil, linkProps)
@@ -351,17 +348,17 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 		R1:        r2.ID(),
 		R2:        r1.ID(),
 		MachineID: r1.MachineId,
-		Latency:   linkProps.Latency,
+		Latency:   linkProps.Latency * 2,
 		Jitter:    linkProps.Jitter,
 		DropRate:  linkProps.DropRate,
 		Bandwidth: linkProps.Bandwidth,
+		Weight:    linkProps.Weight,
 	}
 	_, err := app.cl.SendMsg(r2.MachineId, b, "connectRouterToRouterRemote")
 	if err != nil {
 		return err
 	}
-	ms := int64(linkProps.Latency / time.Millisecond)
-	graphDB.AddPath(r1.ID(), r2.ID(), BiLink.ID(), int(ms))
+	graphDB.AddPath(r1.ID(), r2.ID(), BiLink.ID(), linkProps.Weight)
 	app.PropagateNewRoutes(r1)
 	return nil
 }
@@ -389,7 +386,7 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 
 	r2, _ = app.topo.GetRouter(router2ID)
 
-	router1Channel := make(chan *xdp.Frame, 1000)
+	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
 	conn := app.cl.Endpoints[machineId]
 	app.icm.AddConnection(r2.ID(), conn, r1.ID(), r1.NetworkRouter)
 	toLink := network.CreateLink(router1Channel, nil, linkProps)
@@ -413,8 +410,6 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 	r2.AddRouter(r1, BiLink)
 	toLink.SetShaper(network.CreateRemoteShaper(r2.ID(), r1.ID(), router1Channel, app.icm.GetoutQueue(), linkProps))
 	toLink.Start()
-	//ms := int64(linkProps.Latency / time.Millisecond)
-	//graphDB.AddPath(router1ID, router2ID, BiLink.ID(), int(ms))
 	app.PropagateNewRoutes(r1)
 	return nil
 }

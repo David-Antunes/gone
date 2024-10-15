@@ -24,8 +24,6 @@ import (
 	"time"
 )
 
-const _REMOTE_QUEUESIZE = 1000
-
 type Leader struct {
 	cl         *cluster.Cluster
 	dm         *docker.DockerManager
@@ -272,7 +270,7 @@ func (app *Leader) ConnectNodeToBridge(nodeID string, bridgeID string, linkProps
 		body := &connectApi.ConnectNodeToBridgeRequest{
 			Node:      nodeID,
 			Bridge:    bridgeID,
-			Latency:   int(linkProps.Latency / time.Millisecond),
+			Latency:   int(linkProps.Latency/time.Millisecond) * 2,
 			Jitter:    linkProps.Jitter,
 			DropRate:  linkProps.DropRate,
 			Bandwidth: linkProps.Bandwidth,
@@ -330,7 +328,7 @@ func (app *Leader) ConnectBridgeToRouter(bridgeID string, routerID string, linkP
 		body := &connectApi.ConnectBridgeToRouterRequest{
 			Bridge:    bridgeID,
 			Router:    routerID,
-			Latency:   int(linkProps.Latency / time.Millisecond),
+			Latency:   int(linkProps.Latency/time.Millisecond) * 2,
 			Jitter:    linkProps.Jitter,
 			DropRate:  linkProps.DropRate,
 			Bandwidth: linkProps.Bandwidth,
@@ -428,7 +426,7 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 		R1:        r2.ID(),
 		R2:        r1.ID(),
 		MachineID: r1.MachineId,
-		Latency:   linkProps.Latency,
+		Latency:   linkProps.Latency * 2,
 		Jitter:    linkProps.Jitter,
 		DropRate:  linkProps.DropRate,
 		Bandwidth: linkProps.Bandwidth,
@@ -450,7 +448,7 @@ func (app *Leader) RedirectConnection(r1 *topology.Router, r2 *topology.Router, 
 		R1:        r1.ID(),
 		R2:        r2.ID(),
 		MachineID: r2.MachineId,
-		Latency:   linkProps.Latency,
+		Latency:   linkProps.Latency * 2,
 		Jitter:    linkProps.Jitter,
 		DropRate:  linkProps.DropRate,
 		Bandwidth: linkProps.Bandwidth,
