@@ -342,7 +342,10 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 
 	r1.AddRouter(r2, BiLink)
 	r2.AddRouter(r1, BiLink)
-	toLink.SetShaper(network.CreateRemoteShaper(r2.ID(), r1.ID(), router1Channel, app.icm.GetoutQueue(), linkProps))
+	s := network.CreateRemoteShaper(r2.ID(), r1.ID(), router1Channel, app.icm.GetoutQueue(), linkProps)
+	d, _ := app.cl.GetNodeDelay(r2.MachineId)
+	s.SetDelay(d)
+	toLink.SetShaper(s)
 	toLink.Start()
 	b := &internal.ConnectRouterToRouterRequest{
 		R1:        r2.ID(),
@@ -408,7 +411,10 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 
 	r1.AddRouter(r2, BiLink)
 	r2.AddRouter(r1, BiLink)
-	toLink.SetShaper(network.CreateRemoteShaper(r2.ID(), r1.ID(), router1Channel, app.icm.GetoutQueue(), linkProps))
+	s := network.CreateRemoteShaper(r2.ID(), r1.ID(), router1Channel, app.icm.GetoutQueue(), linkProps)
+	d, _ := app.cl.GetNodeDelay(r2.MachineId)
+	toLink.SetShaper(s)
+	s.SetDelay(d)
 	toLink.Start()
 	app.PropagateNewRoutes(r1)
 	return nil

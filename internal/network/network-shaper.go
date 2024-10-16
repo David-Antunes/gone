@@ -110,6 +110,7 @@ func (shaper *NetworkShaper) receiveNoLatency() {
 			return
 
 		case frame := <-shaper.incoming:
+			frame.Time = frame.Time.Add(-shaper.delay.Value)
 			if len(shaper.queue) < queueSize {
 				shaper.queue <- frame
 			} else {

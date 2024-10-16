@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"sync"
-	"time"
 )
 
 var proxyLog = log.New(os.Stdout, "PROXY INFO: ", log.Ltime)
@@ -76,7 +75,7 @@ func receive(mac string, dec *gob.Decoder, incoming chan *xdp.Frame) {
 			return
 		}
 		if len(incoming) < queueSize {
-			frame.Time = frame.Time.Add(-time.Now().Sub(frame.Time))
+			//frame.Time = frame.Time.Add(-time.Now().Sub(frame.Time))
 			incoming <- frame
 		} else {
 			fmt.Println("Proxy queue full")

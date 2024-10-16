@@ -6,6 +6,7 @@ import (
 	"github.com/David-Antunes/gone/internal/network"
 	"net"
 	"sync"
+	"time"
 )
 
 type InterCommunicationManager struct {
@@ -91,6 +92,7 @@ func (icm *InterCommunicationManager) receiveFrames() {
 		case frame := <-icm.inQueue:
 			icm.Lock()
 			if router, ok := icm.routers[frame.To]; ok {
+				frame.Frame.Time = time.Now()
 				router.InjectFrame(frame.Frame)
 			} else {
 			}

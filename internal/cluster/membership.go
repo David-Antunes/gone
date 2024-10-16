@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/David-Antunes/gone/internal/network"
 	"net"
 	"net/http"
 	"time"
@@ -13,6 +14,7 @@ type Cluster struct {
 	Primary   string
 	Nodes     map[string]ClusterNode
 	Endpoints map[string]net.Conn
+	Rtt       *ClusterRTTManager
 }
 
 type ClusterNode struct {
@@ -39,6 +41,7 @@ func CreateCluster(primary string) *Cluster {
 		Primary:   primary,
 		Nodes:     make(map[string]ClusterNode),
 		Endpoints: make(map[string]net.Conn),
+		Rtt:       NewClusterRTTManager(),
 	}
 }
 
@@ -119,10 +122,19 @@ func (cl *Cluster) RegisterNode(node string, ipAddr string, udpAddr string) erro
 			return errors.New("failed to connect to node " + node)
 		}
 		cl.Endpoints[node] = conn
+		cl.Rtt.AddNode(node, ipAddr)
 	} else {
 		return errors.New("Node already registered")
 	}
 	return nil
+}
+
+func (cl *Cluster) GetNodeDelay(id string) (*network.Delay, error) {
+	if node, ok := cl.Nodes[id]; !ok {
+		return nil, errors.New("node not found")
+	} else {
+		return cl.Rtt.GetDelay(node.Hostname)
+	}
 }
 
 func (cl *Cluster) JoinMembership(serverIp string, hostname string, ipAddr string, udpAddr string) {
