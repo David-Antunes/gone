@@ -1748,11 +1748,7 @@ func (app *Follower) ListIntercepts() []string {
 func (app *Follower) Pause(id string, all bool) error {
 	if all {
 		app.dm.PauseAll()
-		_, err := app.cl.Broadcast(&opApi.PauseRequest{
-			Id:  "",
-			All: true,
-		}, http.MethodPost, "pause")
-		return err
+		return nil
 	} else {
 		if n, ok := app.topo.GetNode(id); ok {
 			if n.MachineId == app.GetMachineId() {
@@ -1772,11 +1768,7 @@ func (app *Follower) Pause(id string, all bool) error {
 func (app *Follower) Unpause(id string, all bool) error {
 	if all {
 		app.dm.UnpauseAll()
-		_, err := app.cl.Broadcast(&opApi.UnpauseRequest{
-			Id:  "",
-			All: true,
-		}, http.MethodPost, "unpause")
-		return err
+		return nil
 	} else {
 		if n, ok := app.topo.GetNode(id); ok {
 			if n.MachineId == app.GetMachineId() {
