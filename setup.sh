@@ -9,8 +9,8 @@ function ctrl_c() {
 
 docker unpause $(docker ps -q)
 docker kill $(docker ps -q --filter "network=gone_net")
-docker kill gone-brain
-docker kill proxy-brain
+docker kill gone-$(hostname)
+docker kill proxy-$(hostname)
 docker kill neo
 
 docker system prune -f
