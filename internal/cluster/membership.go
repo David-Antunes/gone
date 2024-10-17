@@ -36,12 +36,12 @@ type ClusterNodeResponse struct {
 	Nodes    map[string]ClusterNode `json:"nodes"`
 }
 
-func CreateCluster(primary string) *Cluster {
+func CreateCluster(primary string, numObs int) *Cluster {
 	return &Cluster{
 		Primary:   primary,
 		Nodes:     make(map[string]ClusterNode),
 		Endpoints: make(map[string]net.Conn),
-		Rtt:       NewClusterRTTManager(),
+		Rtt:       NewClusterRTTManager(numObs),
 	}
 }
 

@@ -66,6 +66,7 @@ func setEnvVariables() {
 	viper.SetDefault("PROXY_SERVER", "/tmp/proxy-server.sock")
 	viper.SetDefault("PROXY_RTT_UPDATE_MS", 60000)
 	viper.SetDefault("NETWORK_NAMESPACE", "gone_net")
+	viper.SetDefault("NUM_TESTS", 100)
 	viper.SetConfigType("env")
 	err := viper.WriteConfigAs(".env")
 	if err != nil {
@@ -120,7 +121,7 @@ func main() {
 	rtt := application.NewRttManager(rttSocket, time.Duration(viper.GetInt("PROXY_RTT_UPDATE_MS"))*time.Millisecond)
 	go rtt.Start()
 	// Setup channel to send to proxy
-	cl = cluster.CreateCluster(id)
+	cl = cluster.CreateCluster(id, viper.GetInt("NUM_TESTS"))
 	cd := cluster.CreateClusterDaemon(cl, serverIP+":"+serverPort, serverIP+":"+framePort)
 
 	r, err := net.Listen("tcp", ":"+framePort)

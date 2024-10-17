@@ -10,6 +10,7 @@ import (
 
 type ClusterRTTManager struct {
 	endpoints map[string]*nodeRTT
+	numObs    int
 }
 
 type nodeRTT struct {
@@ -18,9 +19,10 @@ type nodeRTT struct {
 	delay  *network.Delay
 }
 
-func NewClusterRTTManager() *ClusterRTTManager {
+func NewClusterRTTManager(numObs int) *ClusterRTTManager {
 	return &ClusterRTTManager{
 		endpoints: make(map[string]*nodeRTT),
+		numObs:    numObs,
 	}
 }
 
@@ -52,7 +54,7 @@ func (rtt *ClusterRTTManager) AddNode(id string, ip string) {
 			fmt.Println("Started rtt logic for", ip)
 			var obs time.Duration
 
-			for i := 0; i < 25; i++ {
+			for i := 0; i < rtt.numObs; i++ {
 				start := time.Now()
 				_, err := http.Get("http://" + ip + "/ping")
 				if err != nil {
@@ -62,7 +64,7 @@ func (rtt *ClusterRTTManager) AddNode(id string, ip string) {
 				obs += end.Sub(start)
 			}
 
-			delay.Value = obs / 25
+			delay.Value = (obs / time.Duration(rtt.numObs)) / 2
 			fmt.Println("Registered delay of", delay.Value, ip)
 			time.Sleep(time.Minute)
 		}
