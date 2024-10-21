@@ -41,5 +41,5 @@ sleep 1
 
 docker run -d --privileged --ulimit memlock=65535 --network none --name proxy-$(hostname) -v /var/run/docker:/var/run/docker -v /tmp:/tmp -e NETWORK=$NETWORK_ID -e NUM_TESTS=100 gone-proxy
 
-docker run -d --privileged --name gone-$(hostname) -p 3000:3000 -p 3001:3001 -v /tmp:/tmp -v /var/run/docker:/var/run/docker -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/proc -e GRAPHDB=$LOCAL_IP -e SERVER_IP=$LOCAL_IP -e PRIMARY_SERVER_IP=$LOCAL_IP -e PRIMARY=1 -e ID=secondary gone
+docker run -d --privileged --name gone-$(hostname) -p 3000:3000 -p 3001:3001 -v /tmp:/tmp -v /var/run/docker:/var/run/docker -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/proc -e GRAPHDB=$LOCAL_IP -e SERVER_IP=$LOCAL_IP -e PRIMARY_SERVER_IP=$LOCAL_IP -e PRIMARY=1 -e ID=primary gone
 

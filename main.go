@@ -94,6 +94,12 @@ func main() {
 	setEnvVariables()
 	viper.AutomaticEnv()
 	printVariables()
+	viper.SetConfigFile("/tmp/gone.env")
+	viper.SetConfigType("env")
+	err := viper.WriteConfig()
+	if err != nil {
+		emulationLog.Println(err)
+	}
 
 	rttSocket, err := net.Dial("unix", viper.GetString("PROXY_RTT_SOCKET"))
 	if err != nil {
