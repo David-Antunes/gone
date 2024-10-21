@@ -16,8 +16,8 @@ type RedirectionSocket struct {
 	id         string
 	socketPath string
 	sock       net.Listener
-	incoming   chan *xdp.Frame
-	outgoing   chan *xdp.Frame
+	incoming   chan *xdp.Frame // Incoming packets from outside
+	outgoing   chan *xdp.Frame // Outgoing packets to outside
 }
 
 func (rs *RedirectionSocket) Id() string {
@@ -38,6 +38,7 @@ func (rs *RedirectionSocket) GetSocketPath() string {
 func NewRedirectionSocket(id string, socketPath string) (*RedirectionSocket, error) {
 	os.Remove(socketPath)
 	socket, err := net.Listen("unix", socketPath)
+	os.Chmod(socketPath, 0777)
 	if err != nil {
 		return nil, err
 	}
@@ -53,13 +54,32 @@ func NewRedirectionSocket(id string, socketPath string) (*RedirectionSocket, err
 func (rs *RedirectionSocket) Start() {
 
 	for {
+
+		// Ignore packets until someone makes a connection
+		c := make(chan struct{})
+		go func() {
+			for {
+				select {
+				case <-c:
+					return
+				case <-rs.outgoing:
+					continue
+				}
+			}
+		}()
+
+		// Await connection
 		conn, err := rs.sock.Accept()
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
+		c <- struct{}{}
+
 		go rs.redirect(conn)
 		dec := gob.NewDecoder(conn)
+
+		// Handle packet receiving from connection
 		for {
 			var frame *xdp.Frame
 
@@ -87,6 +107,8 @@ func (rs *RedirectionSocket) Stop() {
 
 func (rs *RedirectionSocket) redirect(conn net.Conn) {
 	enc := gob.NewEncoder(conn)
+
+	// Manage sending out packets
 	for {
 		select {
 		case frame := <-rs.outgoing:
