@@ -7,3 +7,6 @@
 [submodule "gone-cli"]
 	path = gone-cli
 	url = https://github.com/David-Antunes/gone-cli.git
+[submodule "gone-agent"]
+	path = gone-agent
+	url = https://github.com/David-Antunes/gone-agent
