@@ -117,6 +117,7 @@ func (cl *Cluster) RegisterNode(node string, ipAddr string, udpAddr string) erro
 			IpAddr:   ipAddr,
 			UdpAddr:  udpAddr,
 		}
+		clusterLog.Println("Dialing", udpAddr)
 		conn, err := net.Dial("tcp", udpAddr)
 		if err != nil {
 			return errors.New("failed to connect to node " + node)
