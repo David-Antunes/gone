@@ -52,8 +52,8 @@ func setEnvVariables() {
 		emulationLog.Println(err)
 	}
 	viper.SetDefault("GRAPHDB", "localhost")
-	viper.SetDefault("GRAPHDB_USER", "")
-	viper.SetDefault("GRAPHDB_PASSWORD", "")
+	viper.SetDefault("GRAPHDB_USER", "\"\"")
+	viper.SetDefault("GRAPHDB_PASSWORD", "\"\"")
 	viper.SetDefault("ID", "gone")
 	viper.SetDefault("PRIMARY", 0)
 	viper.SetDefault("PRIMARY_SERVER_IP", "192.168.1.1")
@@ -68,10 +68,10 @@ func setEnvVariables() {
 	viper.SetDefault("NETWORK_NAMESPACE", "gone_net")
 	viper.SetDefault("NUM_TESTS", 100)
 	viper.SetConfigType("env")
-	err := viper.WriteConfigAs(".env")
-	if err != nil {
-		emulationLog.Println(err)
-	}
+	//err := viper.WriteConfig()
+	//if err != nil {
+	//	emulationLog.Println(err)
+	//}
 }
 
 func printVariables() {
@@ -94,8 +94,8 @@ func main() {
 	setEnvVariables()
 	viper.AutomaticEnv()
 	printVariables()
+	os.Remove("/tmp/gone.env")
 	viper.SetConfigFile("/tmp/gone.env")
-	viper.SetConfigType("env")
 	err := viper.WriteConfig()
 	if err != nil {
 		emulationLog.Println(err)
