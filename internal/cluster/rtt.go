@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/David-Antunes/gone/internal/network"
+	"log"
 	"net/http"
 	"time"
 )
@@ -11,6 +12,7 @@ import (
 type ClusterRTTManager struct {
 	endpoints map[string]*nodeRTT
 	numObs    int
+	timeout   time.Duration
 }
 
 type nodeRTT struct {
@@ -19,10 +21,11 @@ type nodeRTT struct {
 	delay  *network.Delay
 }
 
-func NewClusterRTTManager(numObs int) *ClusterRTTManager {
+func NewClusterRTTManager(numObs int, timeout time.Duration) *ClusterRTTManager {
 	return &ClusterRTTManager{
 		endpoints: make(map[string]*nodeRTT),
 		numObs:    numObs,
+		timeout:   timeout,
 	}
 }
 
@@ -51,7 +54,6 @@ func (rtt *ClusterRTTManager) AddNode(id string, ip string) {
 	go func() {
 		time.Sleep(1 * time.Second)
 		for {
-			fmt.Println("Started rtt logic for", ip)
 			var obs time.Duration
 
 			for i := 0; i < rtt.numObs; i++ {
@@ -65,8 +67,13 @@ func (rtt *ClusterRTTManager) AddNode(id string, ip string) {
 			}
 
 			delay.Value = (obs / time.Duration(rtt.numObs)) / 2
-			fmt.Println("Registered delay of", delay.Value, ip)
-			time.Sleep(time.Minute)
+			fmt.Println("RTT INFO REMOTE:", log.Ltime, "Delay of", delay.Value, ip)
+
+			if rtt.timeout >= 0 {
+				time.Sleep(rtt.timeout)
+			} else {
+				return
+			}
 		}
 	}()
 }

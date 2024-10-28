@@ -61,7 +61,7 @@ func createDaemon(app *application.Leader, cd *cluster.ClusterDaemon, ipAddr str
 
 	m.HandleFunc("/sniffNode", sniffNode)
 	m.HandleFunc("/sniffBridge", sniffBridge)
-	m.HandleFunc("/sniffRouter", sniffRouters)
+	m.HandleFunc("/sniffRouters", sniffRouters)
 	m.HandleFunc("/stopSniffNode", stopSniffNode)
 	m.HandleFunc("/stopSniffBridge", stopSniffBridge)
 	m.HandleFunc("/stopSniffRouters", stopSniffRouters)

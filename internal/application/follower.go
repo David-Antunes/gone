@@ -322,7 +322,8 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 
 	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
 	conn := app.cl.Endpoints[r2.MachineId]
-	app.icm.AddConnection(r2.ID(), conn, r1.ID(), r1.NetworkRouter)
+	d, _ := app.cl.GetNodeDelay(r2.MachineId)
+	app.icm.AddConnection(r2.ID(), d, conn, r1.ID(), r1.NetworkRouter)
 	toLink := network.CreateLink(router1Channel, nil, linkProps)
 	topoLink := &topology.Link{
 		Id:          r1.ID() + "-RemoteLink-" + r2.ID(),
@@ -343,7 +344,6 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 	r1.AddRouter(r2, BiLink)
 	r2.AddRouter(r1, BiLink)
 	s := network.CreateRemoteShaper(r2.ID(), r1.ID(), router1Channel, app.icm.GetoutQueue(), linkProps)
-	d, _ := app.cl.GetNodeDelay(r2.MachineId)
 	s.SetDelay(d)
 	toLink.SetShaper(s)
 	toLink.Start()
@@ -391,7 +391,8 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 
 	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
 	conn := app.cl.Endpoints[machineId]
-	app.icm.AddConnection(r2.ID(), conn, r1.ID(), r1.NetworkRouter)
+	d, _ := app.cl.GetNodeDelay(r2.MachineId)
+	app.icm.AddConnection(r2.ID(), d, conn, r1.ID(), r1.NetworkRouter)
 	toLink := network.CreateLink(router1Channel, nil, linkProps)
 	topoLink := &topology.Link{
 		Id:          r1.ID() + "-RemoteLink-" + r2.ID(),
@@ -412,7 +413,6 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 	r1.AddRouter(r2, BiLink)
 	r2.AddRouter(r1, BiLink)
 	s := network.CreateRemoteShaper(r2.ID(), r1.ID(), router1Channel, app.icm.GetoutQueue(), linkProps)
-	d, _ := app.cl.GetNodeDelay(r2.MachineId)
 	toLink.SetShaper(s)
 	s.SetDelay(d)
 	toLink.Start()

@@ -400,7 +400,8 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 
 	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
 	conn := app.cl.Endpoints[r2.MachineId]
-	app.icm.AddConnection(r2.ID(), conn, r1.ID(), r1.NetworkRouter)
+	d, _ := app.cl.GetNodeDelay(r2.MachineId)
+	app.icm.AddConnection(r2.ID(), d, conn, r1.ID(), r1.NetworkRouter)
 	toLink := network.CreateLink(router1Channel, nil, linkProps)
 	topoLink := &topology.Link{
 		Id:          r1.ID() + "-RemoteLink-" + r2.ID(),
@@ -422,7 +423,6 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 	r2.AddRouter(r1, BiLink)
 
 	s := network.CreateRemoteShaper(r2.ID(), r1.ID(), router1Channel, app.icm.GetoutQueue(), linkProps)
-	d, _ := app.cl.GetNodeDelay(r2.MachineId)
 	s.SetDelay(d)
 	toLink.SetShaper(s)
 	toLink.Start()

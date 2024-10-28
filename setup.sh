@@ -11,6 +11,7 @@ docker unpause $(docker ps -q)
 docker kill $(docker ps -q --filter "network=gone_net")
 docker kill gone-$(hostname)
 docker kill proxy-$(hostname)
+docker kill agent-$(hostname)
 docker kill neo
 
 docker system prune -f
@@ -28,6 +29,12 @@ cd ..
 cd gone-proxy
 
 docker build -t gone-proxy .
+
+cd ..
+
+cd gone-agent
+
+docker build -t gone-agent .
 
 cd ..
 

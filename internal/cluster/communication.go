@@ -13,6 +13,7 @@ type InterCommunicationManager struct {
 	sync.Mutex
 	conn        net.Listener
 	connections map[string]*gob.Encoder
+	delays      map[string]*network.Delay
 	inQueue     chan *network.RouterFrame
 	outQueue    chan *network.RouterFrame
 	routers     map[string]*network.Router
@@ -26,8 +27,10 @@ func (icm *InterCommunicationManager) GetoutQueue() chan *network.RouterFrame {
 
 func CreateInterCommunicationManager() *InterCommunicationManager {
 	return &InterCommunicationManager{
+		Mutex:       sync.Mutex{},
 		conn:        nil,
 		connections: make(map[string]*gob.Encoder),
+		delays:      make(map[string]*network.Delay),
 		inQueue:     make(chan *network.RouterFrame, queueSize),
 		outQueue:    make(chan *network.RouterFrame, queueSize),
 		routers:     make(map[string]*network.Router),
@@ -70,10 +73,11 @@ func (icm *InterCommunicationManager) Stop() {
 	icm.ctx <- struct{}{}
 }
 
-func (icm *InterCommunicationManager) AddConnection(remoteRouter string, connection net.Conn, localRouter string, router *network.Router) {
+func (icm *InterCommunicationManager) AddConnection(remoteRouter string, delay *network.Delay, connection net.Conn, localRouter string, router *network.Router) {
 	icm.Lock()
 	icm.connections[remoteRouter] = gob.NewEncoder(connection)
 	icm.routers[localRouter] = router
+	icm.delays[remoteRouter] = delay
 	icm.Unlock()
 }
 
@@ -81,6 +85,7 @@ func (icm *InterCommunicationManager) RemoveConnection(remoteRouter string, loca
 	icm.Lock()
 	delete(icm.connections, remoteRouter)
 	delete(icm.routers, localRouter)
+	delete(icm.delays, remoteRouter)
 	icm.Unlock()
 }
 
@@ -93,6 +98,7 @@ func (icm *InterCommunicationManager) receiveFrames() {
 			icm.Lock()
 			if router, ok := icm.routers[frame.To]; ok {
 				frame.Frame.Time = time.Now()
+				frame.Frame.Time = time.Now().Add(-icm.delays[frame.From].Value)
 				router.InjectFrame(frame.Frame)
 			} else {
 			}
