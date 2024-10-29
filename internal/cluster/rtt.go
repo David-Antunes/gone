@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/David-Antunes/gone/internal/network"
 	"log"
+	"math"
 	"net/http"
 	"time"
 )
@@ -54,8 +55,7 @@ func (rtt *ClusterRTTManager) AddNode(id string, ip string) {
 	go func() {
 		time.Sleep(1 * time.Second)
 		for {
-			var obs time.Duration
-
+			d := time.Duration(math.MaxInt64)
 			for i := 0; i < rtt.numObs; i++ {
 				start := time.Now()
 				_, err := http.Get("http://" + ip + "/ping")
@@ -63,13 +63,14 @@ func (rtt *ClusterRTTManager) AddNode(id string, ip string) {
 					return
 				}
 				end := time.Now()
-				obs += end.Sub(start)
+				obs := end.Sub(start)
+				d = time.Duration(math.Min(float64(obs), float64(d)))
 			}
 
-			delay.Value = (obs / time.Duration(rtt.numObs)) / 2
+			delay.Value = d / 2
 			fmt.Println("RTT INFO REMOTE:", log.Ltime, "Delay of", delay.Value, ip)
 
-			if rtt.timeout >= 0 {
+			if rtt.timeout > 0 {
 				time.Sleep(rtt.timeout)
 			} else {
 				return

@@ -41,9 +41,9 @@ NETWORK_ID=$(docker network list -f "name=gone_net" --format "{{.ID}}")
 
 sleep 1
 
-docker run -d --privileged --ulimit memlock=65535 --network none --name proxy-$(hostname) -v /var/run/docker:/var/run/docker -v /tmp:/tmp -e NETWORK=$NETWORK_ID -e NUM_TESTS=100 gone-proxy
+docker run -d --privileged --ulimit memlock=65535 --network none --name proxy-$(hostname) -v /var/run/docker:/var/run/docker -v /tmp:/tmp -e NETWORK=$NETWORK_ID -e NUM_TESTS=1000 gone-proxy
 
-docker run -d --privileged --name gone-$(hostname) -p 3000:3000 -p 3001:3001 -v /tmp:/tmp -v /var/run/docker:/var/run/docker -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/proc -e GRAPHDB=$LOCAL_IP -e SERVER_IP=$LOCAL_IP -e PRIMARY_SERVER_IP=$LOCAL_IP -e PRIMARY=1 -e ID=primary gone
+docker run -d --privileged --name gone-$(hostname) -p 3000:3000 -p 3001:3001 -v /tmp:/tmp -v /var/run/docker:/var/run/docker -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/proc -e GRAPHDB=$LOCAL_IP -e SERVER_IP=$LOCAL_IP -e PRIMARY_SERVER_IP=$LOCAL_IP -e PRIMARY=1 -e ID=primary -e NUM_TESTS=1000 gone
 
 docker run -d --name agent-$(hostname) -p 3300:3300 -v /tmp:/tmp -v /var/run/docker.sock:/var/run/docker.sock -e GONE_ID=gone-$(hostname) -e GONE_PROXY_ID=proxy-$(hostname) -e GONE_RTT_ID=rtt-$(hostname) -e SERVER_IP=$LOCAL_IP -e PRIMARY_IP=$LOCAL_IP gone-agent
 
