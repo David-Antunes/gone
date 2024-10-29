@@ -1,5 +1,6 @@
 package Operations
 
 type SniffNodeRequest struct {
-	Name string `json:"name"`
+	Node string `json:"node"`
+	Id   string `json:"id"`
 }

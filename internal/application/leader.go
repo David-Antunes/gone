@@ -1371,18 +1371,18 @@ func (app *Leader) StopSniffRouters(id string) error {
 	}
 }
 
-func (app *Leader) SniffNode(id string) (string, string, string, error) {
+func (app *Leader) SniffNode(nodeId string, id string) (string, string, string, error) {
 
-	n, ok := app.topo.GetNode(id)
+	n, ok := app.topo.GetNode(nodeId)
 
 	if !ok {
-		return "", "", "", errors.New(id + " ID doesn't exist")
+		return "", "", "", errors.New(nodeId + " ID doesn't exist")
 	}
 
 	if n.MachineId == app.GetMachineId() {
 
 		if _, ok = app.sniffers[id]; ok {
-			return "", "", "", errors.New("Already sniffing" + id)
+			return "", "", "", errors.New("Already sniffing with " + id)
 		}
 
 		if n.Bridge == nil {
@@ -1395,7 +1395,7 @@ func (app *Leader) SniffNode(id string) (string, string, string, error) {
 			return "", "", "", errors.New("already performing an operation on this link")
 		}
 
-		redirect, err := redirecttraffic.NewRedirectionSocket(id, sniffSocketPath(id))
+		redirect, err := redirecttraffic.NewRedirectionSocket(nodeId, sniffSocketPath(id))
 		if err != nil {
 			return "", "", "", err
 
@@ -1419,7 +1419,8 @@ func (app *Leader) SniffNode(id string) (string, string, string, error) {
 
 	} else {
 		body := &opApi.SniffNodeRequest{
-			Name: id,
+			Node: nodeId,
+			Id:   id,
 		}
 		resp, err := app.cl.SendMsg(n.MachineId, body, "sniffNode")
 		if err != nil {
@@ -1442,17 +1443,17 @@ func (app *Leader) SniffNode(id string) (string, string, string, error) {
 	}
 }
 
-func (app *Leader) SniffBridge(id string) (string, string, string, error) {
+func (app *Leader) SniffBridge(bridgeId string, id string) (string, string, string, error) {
 
-	b, ok := app.topo.GetBridge(id)
+	b, ok := app.topo.GetBridge(bridgeId)
 
 	if !ok {
-		return "", "", "", errors.New(id + " ID doesn't exist")
+		return "", "", "", errors.New(bridgeId + " ID doesn't exist")
 	}
 
 	if b.MachineId == app.GetMachineId() {
 		if _, ok = app.sniffers[id]; ok {
-			return "", "", "", errors.New("Already sniffing" + id)
+			return "", "", "", errors.New("Already sniffing with " + id)
 		}
 
 		if b.Router == nil {
@@ -1465,7 +1466,7 @@ func (app *Leader) SniffBridge(id string) (string, string, string, error) {
 			return "", "", "", errors.New("already performing an operation on this link")
 		}
 
-		redirect, err := redirecttraffic.NewRedirectionSocket(id, sniffSocketPath(id))
+		redirect, err := redirecttraffic.NewRedirectionSocket(bridgeId, sniffSocketPath(id))
 		if err != nil {
 			return "", "", "", err
 
@@ -1489,7 +1490,8 @@ func (app *Leader) SniffBridge(id string) (string, string, string, error) {
 
 	} else {
 		body := &opApi.SniffBridgeRequest{
-			Name: id,
+			Bridge: bridgeId,
+			Id:     id,
 		}
 		resp, err := app.cl.SendMsg(b.MachineId, body, "sniffBridge")
 		if err != nil {
@@ -1511,7 +1513,7 @@ func (app *Leader) SniffBridge(id string) (string, string, string, error) {
 		return req.Id, req.Path, req.MachineId, nil
 	}
 }
-func (app *Leader) SniffRouters(router1 string, router2 string) (string, string, string, error) {
+func (app *Leader) SniffRouters(router1 string, router2 string, id string) (string, string, string, error) {
 
 	r1, ok := app.topo.GetRouter(router1)
 
@@ -1527,11 +1529,8 @@ func (app *Leader) SniffRouters(router1 string, router2 string) (string, string,
 
 	if r1.MachineId == app.GetMachineId() {
 		if r2.MachineId == app.GetMachineId() {
-			if _, ok = app.sniffers[router1+"-"+router2]; ok {
-				return "", "", "", errors.New("already sniffing " + router1 + " and " + router2)
-			}
-			if _, ok = app.sniffers[router2+"-"+router1]; ok {
-				return "", "", "", errors.New("already sniffing " + router1 + " and " + router2)
+			if _, ok = app.sniffers[id]; ok {
+				return "", "", "", errors.New("already sniffing with " + id)
 			}
 			link, ok := r1.RouterLinks[router2]
 			if !ok {
@@ -1544,7 +1543,7 @@ func (app *Leader) SniffRouters(router1 string, router2 string) (string, string,
 				return "", "", "", errors.New("already performing an operation on this link")
 			}
 
-			redirect, err := redirecttraffic.NewRedirectionSocket(router1+"-"+router2, sniffSocketPath(router1+"-"+router2))
+			redirect, err := redirecttraffic.NewRedirectionSocket(router1+"-"+router2, sniffSocketPath(id))
 			if err != nil {
 				return "", "", "", err
 
@@ -1561,10 +1560,10 @@ func (app *Leader) SniffRouters(router1 string, router2 string) (string, string,
 			link.NetworkBILink.Right.SetShaper(newSniff)
 			link.NetworkBILink.Right.Start()
 
-			app.sniffers[router1+"-"+router2] = redirect
+			app.sniffers[id] = redirect
 			go redirect.Start()
 
-			return router1 + "-" + router2, redirect.GetSocketPath(), r1.MachineId, nil
+			return id, redirect.GetSocketPath(), r1.MachineId, nil
 		} else {
 			return "", "", "", errors.New("can't sniff traffic between remote routers")
 		}
@@ -1577,6 +1576,7 @@ func (app *Leader) SniffRouters(router1 string, router2 string) (string, string,
 			body := &opApi.SniffRoutersRequest{
 				Router1: router1,
 				Router2: router2,
+				Id:      id,
 			}
 			resp, err := app.cl.SendMsg(r1.MachineId, body, "sniffRouters")
 			if err != nil {

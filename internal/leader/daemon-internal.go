@@ -209,7 +209,8 @@ func sniffNode(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("sniffNode:", err)
 		daemon.SendError(w, &opApi.SniffNodeResponse{
-			Id: req.Name,
+			Node: req.Node,
+			Id:   req.Id,
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -218,12 +219,13 @@ func sniffNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, path, machineId, err := engine.app.SniffNode(req.Name)
+	id, path, machineId, err := engine.app.SniffNode(req.Node, req.Id)
 
 	if err != nil {
 		daemonLog.Println("sniffNode:", err)
 		daemon.SendError(w, &opApi.SniffNodeResponse{
-			Id: req.Name,
+			Node: req.Node,
+			Id:   req.Id,
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -232,6 +234,7 @@ func sniffNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	daemon.SendResponse(w, &opApi.SniffNodeResponse{
+		Node:      req.Node,
 		Id:        id,
 		Path:      path,
 		MachineId: machineId,
@@ -246,7 +249,8 @@ func sniffBridge(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("sniffBridge:", err)
 		daemon.SendError(w, &opApi.SniffBridgeResponse{
-			Id: req.Name,
+			Bridge: req.Bridge,
+			Id:     req.Id,
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -255,12 +259,13 @@ func sniffBridge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, path, machineId, err := engine.app.SniffBridge(req.Name)
+	id, path, machineId, err := engine.app.SniffBridge(req.Bridge, req.Id)
 
 	if err != nil {
 		daemonLog.Println("sniffBridge:", err)
 		daemon.SendError(w, &opApi.SniffBridgeResponse{
-			Id: req.Name,
+			Bridge: req.Bridge,
+			Id:     req.Id,
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -284,9 +289,9 @@ func sniffRouters(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("sniffRouters:", err)
 		daemon.SendError(w, &opApi.SniffRoutersResponse{
-			Id:        "",
-			Path:      "",
-			MachineId: "",
+			Router1: req.Router1,
+			Router2: req.Router2,
+			Id:      req.Id,
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -295,14 +300,14 @@ func sniffRouters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, path, machineId, err := engine.app.SniffRouters(req.Router1, req.Router2)
+	id, path, machineId, err := engine.app.SniffRouters(req.Router1, req.Router2, req.Id)
 
 	if err != nil {
 		daemonLog.Println("sniffRouters:", err)
 		daemon.SendError(w, &opApi.SniffRoutersResponse{
-			Id:        "",
-			Path:      "",
-			MachineId: "",
+			Router1: req.Router1,
+			Router2: req.Router2,
+			Id:      req.Id,
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -311,6 +316,8 @@ func sniffRouters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	daemon.SendResponse(w, &opApi.SniffRoutersResponse{
+		Router1:   req.Router1,
+		Router2:   req.Router2,
 		Id:        id,
 		Path:      path,
 		MachineId: machineId,
