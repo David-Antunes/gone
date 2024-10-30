@@ -326,7 +326,7 @@ func sniffRouters(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func stopSniffNode(w http.ResponseWriter, r *http.Request) {
+func stopSniff(w http.ResponseWriter, r *http.Request) {
 
 	req := &opApi.StopSniffRequest{}
 
@@ -342,7 +342,7 @@ func stopSniffNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := engine.app.StopSniffNode(req.Id)
+	err := engine.app.StopSniff(req.Id)
 
 	if err != nil {
 		daemonLog.Println("stopSniffNode:", err)
@@ -361,76 +361,7 @@ func stopSniffNode(w http.ResponseWriter, r *http.Request) {
 	})
 
 }
-func stopSniffBridge(w http.ResponseWriter, r *http.Request) {
 
-	req := &opApi.StopSniffRequest{}
-
-	if err := daemon.ParseRequest(r, req); err != nil {
-		daemonLog.Println("stopSniffBridge:", err)
-		daemon.SendError(w, &opApi.StopSniffResponse{
-			Id: req.Id,
-			Error: apiErrors.Error{
-				ErrCode: 1,
-				ErrMsg:  err.Error(),
-			},
-		})
-		return
-	}
-
-	err := engine.app.StopSniffBridge(req.Id)
-
-	if err != nil {
-		daemonLog.Println("stopSniffBridge:", err)
-		daemon.SendError(w, &opApi.StopSniffResponse{
-			Id: req.Id,
-			Error: apiErrors.Error{
-				ErrCode: 1,
-				ErrMsg:  err.Error(),
-			},
-		})
-		return
-	}
-	daemon.SendResponse(w, &opApi.StopSniffResponse{
-		Id:    req.Id,
-		Error: apiErrors.Error{},
-	})
-
-}
-func stopSniffRouters(w http.ResponseWriter, r *http.Request) {
-
-	req := &opApi.StopSniffRequest{}
-
-	if err := daemon.ParseRequest(r, req); err != nil {
-		daemonLog.Println("stopSniffRouters:", err)
-		daemon.SendError(w, &opApi.StopSniffResponse{
-			Id: req.Id,
-			Error: apiErrors.Error{
-				ErrCode: 1,
-				ErrMsg:  err.Error(),
-			},
-		})
-		return
-	}
-
-	err := engine.app.StopSniffRouters(req.Id)
-
-	if err != nil {
-		daemonLog.Println("stopSniffRouters:", err)
-		daemon.SendError(w, &opApi.StopSniffResponse{
-			Id: req.Id,
-			Error: apiErrors.Error{
-				ErrCode: 1,
-				ErrMsg:  err.Error(),
-			},
-		})
-		return
-	}
-	daemon.SendResponse(w, &opApi.StopSniffResponse{
-		Id:    req.Id,
-		Error: apiErrors.Error{},
-	})
-
-}
 func listSniffers(w http.ResponseWriter, r *http.Request) {
 
 	ids := engine.app.ListSniffers()
@@ -447,7 +378,10 @@ func interceptNode(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("interceptNode:", err)
 		daemon.SendError(w, &opApi.InterceptNodeResponse{
-			Id: req.Name,
+			Node:      req.Node,
+			Id:        req.Id,
+			Path:      "",
+			MachineId: "",
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -456,12 +390,15 @@ func interceptNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, path, machineId, err := engine.app.InterceptNode(req.Name, req.Direction)
+	id, path, machineId, err := engine.app.InterceptNode(req.Node, req.Id, req.Direction)
 
 	if err != nil {
 		daemonLog.Println("interceptNode:", err)
 		daemon.SendError(w, &opApi.InterceptNodeResponse{
-			Id: req.Name,
+			Node:      req.Node,
+			Id:        req.Id,
+			Path:      "",
+			MachineId: "",
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -484,7 +421,10 @@ func interceptBridge(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("interceptBridge:", err)
 		daemon.SendError(w, &opApi.InterceptBridgeResponse{
-			Id: req.Name,
+			Id:        req.Id,
+			Bridge:    req.Bridge,
+			Path:      "",
+			MachineId: "",
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -493,12 +433,15 @@ func interceptBridge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, path, machineId, err := engine.app.InterceptBridge(req.Name, req.Direction)
+	id, path, machineId, err := engine.app.InterceptBridge(req.Bridge, req.Id, req.Direction)
 
 	if err != nil {
 		daemonLog.Println("interceptBridge:", err)
 		daemon.SendError(w, &opApi.InterceptBridgeResponse{
-			Id: req.Name,
+			Id:        req.Id,
+			Bridge:    req.Bridge,
+			Path:      "",
+			MachineId: "",
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -521,7 +464,11 @@ func interceptRouters(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("interceptRouters:", err)
 		daemon.SendError(w, &opApi.InterceptRoutersResponse{
-			Id: "",
+			Router1:   req.Router1,
+			Router2:   req.Router2,
+			Id:        req.Id,
+			Path:      "",
+			MachineId: "",
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -530,12 +477,15 @@ func interceptRouters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, path, machineId, err := engine.app.InterceptRouters(req.Router1, req.Router2, req.Direction)
+	id, path, machineId, err := engine.app.InterceptRouters(req.Router1, req.Router2, req.Id, req.Direction)
 
 	if err != nil {
 		daemonLog.Println("interceptRouters:", err)
 		daemon.SendError(w, &opApi.InterceptRoutersResponse{
-			Id: "",
+			Router1: req.Router1,
+			Router2: req.Router2,
+			Id:      req.Id,
+
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -551,7 +501,7 @@ func interceptRouters(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func stopInterceptNode(w http.ResponseWriter, r *http.Request) {
+func stopIntercept(w http.ResponseWriter, r *http.Request) {
 
 	req := &opApi.StopInterceptRequest{}
 
@@ -567,7 +517,7 @@ func stopInterceptNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := engine.app.StopInterceptNode(req.Id, req.Direction)
+	err := engine.app.StopIntercept(req.Id)
 
 	if err != nil {
 		daemonLog.Println("stopInterceptNode:", err)
@@ -584,85 +534,14 @@ func stopInterceptNode(w http.ResponseWriter, r *http.Request) {
 		Id:    req.Id,
 		Error: apiErrors.Error{},
 	})
-}
-
-func stopInterceptBridge(w http.ResponseWriter, r *http.Request) {
-
-	req := &opApi.StopInterceptRequest{}
-
-	if err := daemon.ParseRequest(r, req); err != nil {
-		daemonLog.Println("stopInterceptBridge:", err)
-		daemon.SendError(w, &opApi.StopInterceptResponse{
-			Id: req.Id,
-			Error: apiErrors.Error{
-				ErrCode: 1,
-				ErrMsg:  err.Error(),
-			},
-		})
-		return
-	}
-
-	err := engine.app.StopInterceptBridge(req.Id, req.Direction)
-
-	if err != nil {
-		daemonLog.Println("stopInterceptBridge:", err)
-		daemon.SendError(w, &opApi.StopInterceptResponse{
-			Id: req.Id,
-			Error: apiErrors.Error{
-				ErrCode: 1,
-				ErrMsg:  err.Error(),
-			},
-		})
-		return
-	}
-	daemon.SendResponse(w, &opApi.StopInterceptResponse{
-		Id:    req.Id,
-		Error: apiErrors.Error{},
-	})
-}
-
-func stopInterceptRouters(w http.ResponseWriter, r *http.Request) {
-
-	req := &opApi.StopInterceptRequest{}
-
-	if err := daemon.ParseRequest(r, req); err != nil {
-		daemonLog.Println("stopInterceptRouters:", err)
-		daemon.SendError(w, &opApi.StopInterceptResponse{
-			Id: req.Id,
-			Error: apiErrors.Error{
-				ErrCode: 1,
-				ErrMsg:  err.Error(),
-			},
-		})
-		return
-	}
-
-	err := engine.app.StopInterceptRouters(req.Id, req.Direction)
-
-	if err != nil {
-		daemonLog.Println("stopInterceptRouters:", err)
-		daemon.SendError(w, &opApi.StopInterceptResponse{
-			Id: req.Id,
-			Error: apiErrors.Error{
-				ErrCode: 1,
-				ErrMsg:  err.Error(),
-			},
-		})
-		return
-	}
-	daemon.SendResponse(w, &opApi.StopInterceptResponse{
-		Id:    req.Id,
-		Error: apiErrors.Error{},
-	})
-
 }
 
 func listIntercepts(w http.ResponseWriter, r *http.Request) {
 
 	ids := engine.app.ListIntercepts()
 
-	daemon.SendResponse(w, &opApi.ListSniffersResponse{
-		Sniffers: ids,
+	daemon.SendResponse(w, &opApi.ListInterceptsResponse{
+		Intercepts: ids,
 	})
 }
 

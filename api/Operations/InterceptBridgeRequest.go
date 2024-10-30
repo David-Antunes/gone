@@ -1,6 +1,7 @@
 package Operations
 
 type InterceptBridgeRequest struct {
-	Name      string `json:"name"`
+	Bridge    string `json:"bridge"`
+	Id        string `json:"id"`
 	Direction bool   `json:"direction"`
 }

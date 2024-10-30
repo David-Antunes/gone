@@ -18,7 +18,7 @@ type InterceptShaper struct {
 	limiter   *rate.Limiter
 	tokenSize int
 	ctx       chan struct{}
-	rt        *redirect_traffic.RedirectionSocket
+	rt        *redirect_traffic.InterceptComponent
 }
 
 func (shaper *InterceptShaper) GetProps() LinkProps {
@@ -41,10 +41,10 @@ func (shaper *InterceptShaper) GetDelay() *Delay {
 }
 
 func (shaper *InterceptShaper) GetRtID() string {
-	return shaper.rt.Id()
+	return shaper.rt.Id
 }
 
-func NewInterceptShaper(incoming chan *xdp.Frame, outgoing chan *xdp.Frame, props LinkProps, rt *redirect_traffic.RedirectionSocket) Shaper {
+func NewInterceptShaper(incoming chan *xdp.Frame, outgoing chan *xdp.Frame, props LinkProps, rt *redirect_traffic.InterceptComponent) Shaper {
 	aux := float64(packetSize) / float64(props.Bandwidth)
 	newTime := float64(time.Second) * aux
 
@@ -86,9 +86,9 @@ func (shaper *InterceptShaper) receive() {
 			return
 
 		case frame := <-shaper.incoming:
-			shaper.rt.GetOutgoing() <- frame
+			shaper.rt.Socket.GetOutgoing() <- frame
 
-		case frame := <-shaper.rt.GetIncoming():
+		case frame := <-shaper.rt.Socket.GetIncoming():
 
 			frame.Time = frame.Time.Add(shaper.props.Latency)
 			frame.Time = frame.Time.Add(shaper.props.PollJitter())

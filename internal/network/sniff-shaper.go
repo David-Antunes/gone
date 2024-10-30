@@ -18,7 +18,7 @@ type SniffShaper struct {
 	limiter   *rate.Limiter
 	tokenSize int
 	ctx       chan struct{}
-	rt        *redirect_traffic.RedirectionSocket
+	rt        *redirect_traffic.SniffComponent
 }
 
 func (shaper *SniffShaper) GetProps() LinkProps {
@@ -41,10 +41,10 @@ func (shaper *SniffShaper) GetDelay() *Delay {
 }
 
 func (shaper *SniffShaper) GetRtID() string {
-	return shaper.rt.Id()
+	return shaper.rt.Id
 }
 
-func NewSniffShaper(incoming chan *xdp.Frame, outgoing chan *xdp.Frame, props LinkProps, rt *redirect_traffic.RedirectionSocket) Shaper {
+func NewSniffShaper(incoming chan *xdp.Frame, outgoing chan *xdp.Frame, props LinkProps, rt *redirect_traffic.SniffComponent) Shaper {
 	aux := float64(packetSize / props.Bandwidth)
 	newTime := float64(time.Second) * aux
 	return &SniffShaper{
@@ -84,13 +84,13 @@ func (shaper *SniffShaper) receive() {
 		select {
 		case <-shaper.ctx:
 			return
-		case <-shaper.rt.GetIncoming():
+		case <-shaper.rt.Socket.GetIncoming():
 			continue
 		case frame := <-shaper.incoming:
 			if shaper.props.PollDropRate() {
 				continue
 			}
-			shaper.rt.GetOutgoing() <- frame
+			shaper.rt.Socket.GetOutgoing() <- frame
 			frame.Time = frame.Time.Add(shaper.props.Latency)
 			frame.Time = frame.Time.Add(shaper.props.PollJitter())
 			frame.Time = frame.Time.Add(-shaper.delay.Value)

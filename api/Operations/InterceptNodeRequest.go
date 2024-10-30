@@ -1,6 +1,7 @@
 package Operations
 
 type InterceptNodeRequest struct {
-	Name      string `json:"name"`
+	Node      string `json:"node"`
+	Id        string `json:"Id"`
 	Direction bool   `json:"direction"`
 }

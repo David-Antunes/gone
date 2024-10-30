@@ -152,7 +152,7 @@ func (shaper *NetworkShaper) send() {
 	}
 }
 
-func (shaper *NetworkShaper) ConvertToSniffShaper(rt *redirect_traffic.RedirectionSocket) *SniffShaper {
+func (shaper *NetworkShaper) ConvertToSniffShaper(rt *redirect_traffic.SniffComponent) *SniffShaper {
 	return &SniffShaper{
 		running:   false,
 		queue:     shaper.queue,
@@ -167,7 +167,7 @@ func (shaper *NetworkShaper) ConvertToSniffShaper(rt *redirect_traffic.Redirecti
 	}
 }
 
-func (shaper *NetworkShaper) ConvertToInterceptShaper(rt *redirect_traffic.RedirectionSocket) *InterceptShaper {
+func (shaper *NetworkShaper) ConvertToInterceptShaper(rt *redirect_traffic.InterceptComponent) *InterceptShaper {
 	return &InterceptShaper{
 		running:   false,
 		queue:     shaper.queue,

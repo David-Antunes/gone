@@ -17,8 +17,8 @@ type RemoteShaper struct {
 	limiter   *rate.Limiter
 	tokenSize int
 	ctx       chan struct{}
-	to        string
-	from      string
+	To        string
+	From      string
 }
 
 func (shaper *RemoteShaper) GetProps() LinkProps {
@@ -53,8 +53,8 @@ func CreateRemoteShaper(to string, from string, incoming chan *xdp.Frame, outgoi
 		tokenSize: packetSize,
 		delay:     &Delay{0},
 		ctx:       make(chan struct{}),
-		to:        to,
-		from:      from,
+		To:        to,
+		From:      from,
 	}
 }
 func (shaper *RemoteShaper) Stop() {
@@ -120,8 +120,8 @@ func (shaper *RemoteShaper) send() {
 				time.Sleep(time.Until(frame.Time))
 				if len(shaper.outgoing) < queueSize {
 					shaper.outgoing <- &RouterFrame{
-						To:    shaper.to,
-						From:  shaper.from,
+						To:    shaper.To,
+						From:  shaper.From,
 						Frame: frame,
 					}
 				} else {

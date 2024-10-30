@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
-	api "github.com/David-Antunes/gone/api/Add"
+	"github.com/David-Antunes/gone/api"
+	addApi "github.com/David-Antunes/gone/api/Add"
 	opApi "github.com/David-Antunes/gone/api/Operations"
 	internal "github.com/David-Antunes/gone/internal/api"
 	"github.com/David-Antunes/gone/internal/cluster"
@@ -17,30 +18,27 @@ import (
 	"github.com/David-Antunes/gone/internal/topology"
 	"net"
 	"net/http"
-	"strings"
 )
 
 type Follower struct {
-	cl         *cluster.Cluster
-	dm         *docker.DockerManager
-	proxy      *proxy.Proxy
-	topo       *topology.Topology
-	icm        *cluster.InterCommunicationManager
-	rm         *RttManager
-	sniffers   map[string]*redirecttraffic.RedirectionSocket
-	intercepts map[string]*redirecttraffic.RedirectionSocket
+	cl              *cluster.Cluster
+	dm              *docker.DockerManager
+	proxy           *proxy.Proxy
+	topo            *topology.Topology
+	icm             *cluster.InterCommunicationManager
+	rm              *RttManager
+	redirectManager *redirecttraffic.RedirectManager
 }
 
 func NewFollower(cl *cluster.Cluster, dm *docker.DockerManager, proxy *proxy.Proxy, icm *cluster.InterCommunicationManager, rm *RttManager) *Follower {
 	return &Follower{
-		cl:         cl,
-		dm:         dm,
-		proxy:      proxy,
-		topo:       topology.CreateTopology(dm.GetMachineId(), proxy, rm.GetRtt()),
-		icm:        icm,
-		rm:         rm,
-		sniffers:   make(map[string]*redirecttraffic.RedirectionSocket),
-		intercepts: make(map[string]*redirecttraffic.RedirectionSocket),
+		cl:              cl,
+		dm:              dm,
+		proxy:           proxy,
+		topo:            topology.CreateTopology(dm.GetMachineId(), proxy, rm.GetRtt()),
+		icm:             icm,
+		rm:              rm,
+		redirectManager: redirecttraffic.NewRedirectManager(),
 	}
 }
 
@@ -63,30 +61,90 @@ func (app *Follower) GetRouterWeights(id string) map[string]topology.Weight {
 	return r.Weights
 }
 
-func (app *Follower) specialLinkCleanup(link *network.BiLink) {
+// Changes sniffShaper into network shaper
+func (app *Follower) clearSniffLink(id string) error {
+	if sniffer, err := app.redirectManager.GetSniffer(id); err != nil {
+		return err
+	} else {
+		err = app.redirectManager.RemoveSniffer(id)
+		sniffer.Socket.Stop()
+		if err != nil {
+			return err
+		} else {
+			// Convert to topology Bilink
+			bilink := sniffer.Component.(*topology.BiLink).NetworkBILink
+
+			// Convert to individual Link
+			bilink.Left.GetShaper().Stop()
+			l := bilink.Left.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
+			bilink.Left.SetShaper(l)
+			l.Start()
+
+			bilink.Right.GetShaper().Stop()
+			r := bilink.Right.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
+			bilink.Right.SetShaper(l)
+			r.Start()
+		}
+	}
+	return nil
+}
+
+// Changes Intercept into network shaper
+func (app *Follower) clearInterceptLink(id string) error {
+	if sniffer, err := app.redirectManager.GetIntercept(id); err != nil {
+		return err
+	} else {
+		err = app.redirectManager.RemoveIntercept(id)
+		if err != nil {
+			return err
+		} else {
+
+			// Convert to network link
+			link := sniffer.Component.(*topology.Link).NetworkLink
+
+			link.GetShaper().Stop()
+			l := link.GetShaper().(*network.InterceptShaper).ConvertToNetworkShaper()
+			link.SetShaper(l)
+			l.Start()
+		}
+	}
+	return nil
+}
+
+// Garbage collects shapers
+func (app *Follower) gcLinkShaper(link *network.BiLink) error {
 
 	if link.Left != nil {
 
+		link.Left.Stop()
 		if s, ok := link.Left.GetShaper().(*network.SniffShaper); ok {
-			delete(app.sniffers, s.GetRtID())
-			return
+			_ = app.redirectManager.RemoveSniffer(s.GetRtID())
 		}
-		if s, ok := link.Right.GetShaper().(*network.SniffShaper); ok {
-			delete(app.sniffers, s.GetRtID())
-			return
-		}
-	}
-	if link.Right != nil {
 
 		if s, ok := link.Left.GetShaper().(*network.InterceptShaper); ok {
-			delete(app.intercepts, s.GetRtID())
-			return
+			_ = app.redirectManager.RemoveIntercept(s.GetRtID())
 		}
-		if s, ok := link.Right.GetShaper().(*network.InterceptShaper); ok {
-			delete(app.intercepts, s.GetRtID())
-			return
+		if s, ok := link.Left.GetShaper().(*network.RemoteShaper); ok {
+			app.icm.RemoveConnection(s.To, s.From)
 		}
 	}
+
+	if link.Right != nil {
+		link.Right.Stop()
+		if s, ok := link.Right.GetShaper().(*network.SniffShaper); ok {
+			_ = app.redirectManager.RemoveSniffer(s.GetRtID())
+		}
+
+		if s, ok := link.Right.GetShaper().(*network.InterceptShaper); ok {
+			_ = app.redirectManager.RemoveIntercept(s.GetRtID())
+		}
+
+		if s, ok := link.Right.GetShaper().(*network.RemoteShaper); ok {
+			app.icm.RemoveConnection(s.To, s.From)
+		}
+	}
+
+	return nil
 }
 
 func (app *Follower) HandleNewMac(frame *xdp.Frame, routerId string) {
@@ -108,7 +166,7 @@ func (app *Follower) HandleNewMac(frame *xdp.Frame, routerId string) {
 }
 
 func (app *Follower) execInMachine(machineId string, dockerCmd []string) (string, string, string, error) {
-	body := &api.AddNodeRequest{
+	body := &addApi.AddNodeRequest{
 		DockerCmd: dockerCmd,
 		MachineId: machineId,
 	}
@@ -121,7 +179,7 @@ func (app *Follower) execInMachine(machineId string, dockerCmd []string) (string
 
 	d := json.NewDecoder(resp.Body)
 
-	result := &api.AddNodeResponse{}
+	result := &addApi.AddNodeResponse{}
 	err = d.Decode(&result)
 	if err != nil {
 		return "", "", "", err
@@ -585,7 +643,7 @@ func (app *Follower) RemoveNode(nodeId string) error {
 	}
 
 	if link != nil {
-		app.specialLinkCleanup(link.NetworkBILink)
+		app.gcLinkShaper(link.NetworkBILink)
 	}
 
 	if n.MachineId == app.GetMachineId() {
@@ -649,7 +707,7 @@ func (app *Follower) RemoveBridge(bridgeId string) error {
 	}
 
 	if link != nil {
-		app.specialLinkCleanup(link.NetworkBILink)
+		app.gcLinkShaper(link.NetworkBILink)
 	}
 	return nil
 }
@@ -678,7 +736,7 @@ func (app *Follower) RemoveRouter(routerId string) error {
 	}
 
 	for _, link := range links {
-		app.specialLinkCleanup(link.NetworkBILink)
+		app.gcLinkShaper(link.NetworkBILink)
 	}
 
 	return nil
@@ -702,7 +760,7 @@ func (app *Follower) DisconnectNode(id string) error {
 				return err
 			}
 			if link != nil {
-				app.specialLinkCleanup(link.NetworkBILink)
+				app.gcLinkShaper(link.NetworkBILink)
 			}
 
 			return nil
@@ -712,7 +770,7 @@ func (app *Follower) DisconnectNode(id string) error {
 		}
 	}
 
-	return errors.New("This node shouldn't be registered in this follower")
+	return errors.New("this node shouldn't be registered in this follower")
 }
 
 func (app *Follower) DisconnectBridge(id string) error {
@@ -733,13 +791,13 @@ func (app *Follower) DisconnectBridge(id string) error {
 			return err
 		}
 		if link != nil {
-			app.specialLinkCleanup(link.NetworkBILink)
+			app.gcLinkShaper(link.NetworkBILink)
 		}
 
 		return nil
 	}
 
-	return errors.New("This bridge shouldn't be registered in this follower")
+	return errors.New("this bridge shouldn't be registered in this follower")
 }
 func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 
@@ -762,7 +820,7 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 			return err
 		}
 		if link != nil {
-			app.specialLinkCleanup(link.NetworkBILink)
+			app.gcLinkShaper(link.NetworkBILink)
 		}
 		return nil
 	} else {
@@ -774,11 +832,11 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 				return err
 			}
 			if link != nil {
-				app.specialLinkCleanup(link.NetworkBILink)
+				app.gcLinkShaper(link.NetworkBILink)
 			}
 			return nil
 		} else {
-			fmt.Println("Tried to disconnect two remote routers in a follower")
+			fmt.Println("tried to disconnect two remote routers in a follower")
 			return nil
 		}
 	}
@@ -850,211 +908,46 @@ func (app *Follower) Forget(routerId string) error {
 	return nil
 }
 
-func (app *Follower) ListSniffers() []string {
+func (app *Follower) ListSniffers() []api.SniffComponent {
 
-	ids := make([]string, 0, len(app.sniffers))
+	sniffers := app.redirectManager.ListSniffers()
 
-	for id := range app.sniffers {
-		ids = append(ids, id)
+	list := make([]api.SniffComponent, len(sniffers))
+
+	for id, s := range sniffers {
+		link := s.Component.(*topology.BiLink)
+		list = append(list, api.SniffComponent{
+			Id:        id,
+			MachineId: s.MachineId,
+			To:        link.ConnectsTo.ID(),
+			From:      link.ConnectsFrom.ID(),
+			Path:      s.Socket.GetSocketPath(),
+		})
 	}
 
-	return ids
+	return list
 }
 
-func (app *Follower) StopSniffNode(id string) error {
-
-	n, ok := app.topo.GetNode(id)
-
-	if !ok {
-		return errors.New(id + " ID doesn't exist")
-	}
-
-	if n.MachineId == app.GetMachineId() {
-		var redirect *redirecttraffic.RedirectionSocket
-		if redirect, ok = app.sniffers[id]; !ok {
-			return errors.New("not sniffing traffic in this node")
-		}
-
-		if n.Bridge == nil {
-			app.sniffers[id].Stop()
-			delete(app.sniffers, id)
-			return errors.New(id + "is not connected to any bridge")
-		}
-
-		n.Link.NetworkBILink.Left.Stop()
-		n.Link.NetworkBILink.Right.Stop()
-
-		newSniff := n.Link.NetworkBILink.Left.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
-		n.Link.NetworkBILink.Left.SetShaper(newSniff)
-		n.Link.NetworkBILink.Left.Start()
-
-		newSniff = n.Link.NetworkBILink.Right.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
-		n.Link.NetworkBILink.Right.SetShaper(newSniff)
-		n.Link.NetworkBILink.Right.Start()
-
-		delete(app.sniffers, id)
-		redirect.Stop()
-
-		return nil
-
+func (app *Follower) StopSniff(id string) error {
+	if s, err := app.redirectManager.GetSniffer(id); err == nil {
+		return err
 	} else {
-		body := &opApi.StopSniffRequest{
-			Id: id,
-		}
-		resp, err := app.cl.SendMsg(n.MachineId, body, "stopSniffNode")
-		if err != nil {
-			return err
-		}
-
-		d := json.NewDecoder(resp.Body)
-		req := &opApi.StopSniffResponse{}
-		err = d.Decode(&req)
-
-		if err != nil {
-			return err
-		}
-
-		if req.Error.ErrCode != 0 {
-			return errors.New(req.Error.ErrMsg)
-		}
-
-		return nil
-	}
-}
-func (app *Follower) StopSniffBridge(id string) error {
-
-	b, ok := app.topo.GetBridge(id)
-
-	if !ok {
-		return errors.New(id + " ID doesn't exist")
-	}
-
-	if b.MachineId == app.GetMachineId() {
-		var redirect *redirecttraffic.RedirectionSocket
-		if redirect, ok = app.sniffers[id]; !ok {
-			return errors.New("not sniffing traffic in this bridge")
-		}
-
-		if b.Router == nil {
-			app.sniffers[id].Stop()
-			delete(app.sniffers, id)
-			return errors.New(id + "is not connected to any router")
-		}
-
-		b.RouterLink.NetworkBILink.Left.Stop()
-		b.RouterLink.NetworkBILink.Right.Stop()
-
-		newSniff := b.RouterLink.NetworkBILink.Left.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
-		b.RouterLink.NetworkBILink.Left.SetShaper(newSniff)
-		b.RouterLink.NetworkBILink.Left.Start()
-
-		newSniff = b.RouterLink.NetworkBILink.Right.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
-		b.RouterLink.NetworkBILink.Right.SetShaper(newSniff)
-		b.RouterLink.NetworkBILink.Right.Start()
-
-		delete(app.sniffers, id)
-		redirect.Stop()
-
-		return nil
-
-	} else {
-		body := &opApi.StopSniffRequest{
-			Id: id,
-		}
-		resp, err := app.cl.SendMsg(b.MachineId, body, "stopSniffBridge")
-		if err != nil {
-			return err
-		}
-
-		d := json.NewDecoder(resp.Body)
-		req := &opApi.StopSniffResponse{}
-		err = d.Decode(&req)
-
-		if err != nil {
-			return err
-		}
-
-		if req.Error.ErrCode != 0 {
-			return errors.New(req.Error.ErrMsg)
-		}
-
-		return nil
-	}
-
-}
-func (app *Follower) StopSniffRouters(id string) error {
-	routers := strings.Split(id, "-")
-
-	if len(routers) != 2 {
-		return errors.New("invalid id")
-	}
-
-	r1, ok := app.topo.GetRouter(routers[0])
-
-	if !ok {
-		return errors.New(routers[0] + " ID doesn't exist")
-	}
-
-	r2, ok := app.topo.GetRouter(routers[1])
-
-	if !ok {
-		return errors.New(routers[1] + " ID doesn't exist")
-	}
-
-	if r1.MachineId == app.GetMachineId() {
-		if r2.MachineId == app.GetMachineId() {
-			var redirect *redirecttraffic.RedirectionSocket
-			if redirect, ok = app.sniffers[r1.ID()+"-"+r2.ID()]; !ok {
-				return errors.New("not sniffing traffic between" + r1.ID() + " and " + r2.ID())
-
-			} else {
-				delete(app.sniffers, r1.ID()+"-"+r2.ID())
-				redirect.Stop()
+		if app.GetMachineId() == s.MachineId {
+			err = app.clearSniffLink(id)
+			if err != nil {
+				return err
 			}
-			if redirect, ok = app.sniffers[r2.ID()+"-"+r1.ID()]; !ok {
-				return errors.New("not sniffing traffic between" + r1.ID() + " and " + r2.ID())
-
-			} else {
-				delete(app.sniffers, r2.ID()+"-"+r1.ID())
-				redirect.Stop()
-			}
-
-			link, ok := r1.RouterLinks[r2.ID()]
-			if !ok {
-				return errors.New(r1.ID() + " and " + r2.ID() + "are not connected")
-			}
-
-			link.NetworkBILink.Left.Stop()
-			link.NetworkBILink.Right.Stop()
-
-			newSniff := link.NetworkBILink.Left.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
-			link.NetworkBILink.Left.SetShaper(newSniff)
-			link.NetworkBILink.Left.Start()
-
-			newSniff = link.NetworkBILink.Right.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
-			link.NetworkBILink.Right.SetShaper(newSniff)
-			link.NetworkBILink.Right.Start()
-
-			return nil
 		} else {
-			return errors.New("can't sniff traffic between remote routers")
-		}
-
-	} else {
-		if r2.MachineId == app.GetMachineId() {
-			return errors.New("can't sniff traffic between remote routers")
-		} else {
-
 			body := &opApi.StopSniffRequest{
 				Id: id,
 			}
-			resp, err := app.cl.SendMsg(r1.MachineId, body, "stopSniffRouters")
+			resp, err := app.cl.SendMsg(s.MachineId, body, "stopSniff")
 			if err != nil {
 				return err
 			}
 
 			d := json.NewDecoder(resp.Body)
-			req := &opApi.SniffRoutersResponse{}
+			req := &opApi.StopSniffResponse{}
 			err = d.Decode(&req)
 
 			if err != nil {
@@ -1064,10 +957,10 @@ func (app *Follower) StopSniffRouters(id string) error {
 			if req.Error.ErrCode != 0 {
 				return errors.New(req.Error.ErrMsg)
 			}
-
-			return nil
+			app.redirectManager.RemoveSniffer(id)
 		}
 	}
+	return nil
 }
 
 func (app *Follower) SniffNode(nodeId string, id string) (string, string, string, error) {
@@ -1078,32 +971,49 @@ func (app *Follower) SniffNode(nodeId string, id string) (string, string, string
 		return "", "", "", errors.New(nodeId + " ID doesn't exist")
 	}
 
-	if n.MachineId == app.GetMachineId() {
-		if _, ok = app.sniffers[id]; ok {
-			return "", "", "", errors.New("Already sniffing" + id)
-		}
-		redirect, err := redirecttraffic.NewRedirectionSocket(nodeId, sniffSocketPath(id))
-		if err != nil {
-			return "", "", "", err
+	if _, err := app.redirectManager.GetSniffer(id); err == nil {
+		return "", "", "", errors.New("Already sniffing with " + id)
+	}
 
-		}
+	if n.MachineId == app.GetMachineId() {
 
 		if n.Bridge == nil {
 			return "", "", "", errors.New(id + "is not connected to any bridge")
 		}
 
+		if isSpecialLink(n.Link.ConnectsFrom) {
+			return "", "", "", errors.New("already performing an operation on this link")
+		} else if isSpecialLink(n.Link.ConnectsTo) {
+			return "", "", "", errors.New("already performing an operation on this link")
+		}
+
+		redirect, err := redirecttraffic.NewRedirectionSocket(id, sniffSocketPath(id))
+		if err != nil {
+			return "", "", "", err
+
+		}
+
+		sniffComponent := &redirecttraffic.SniffComponent{
+			Id:        id,
+			MachineId: app.GetMachineId(),
+			Socket:    redirect,
+			Component: n.Link,
+		}
+
+		app.redirectManager.AddSniffer(id, sniffComponent)
+
 		n.Link.NetworkBILink.Left.Stop()
 		n.Link.NetworkBILink.Right.Stop()
 
-		newSniff := n.Link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(redirect)
+		newSniff := n.Link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		n.Link.NetworkBILink.Left.SetShaper(newSniff)
 		n.Link.NetworkBILink.Left.Start()
 
-		newSniff = n.Link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(redirect)
+		newSniff = n.Link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		n.Link.NetworkBILink.Right.SetShaper(newSniff)
 		n.Link.NetworkBILink.Right.Start()
 
-		app.sniffers[id] = redirect
+		go redirect.Start()
 
 		return id, redirect.GetSocketPath(), n.MachineId, nil
 
@@ -1129,6 +1039,15 @@ func (app *Follower) SniffNode(nodeId string, id string) (string, string, string
 			return "", "", "", errors.New(req.Error.ErrMsg)
 		}
 
+		s := &redirecttraffic.SniffComponent{
+			Id:        id,
+			MachineId: n.MachineId,
+			Socket:    nil,
+			Component: nil,
+		}
+
+		app.redirectManager.AddSniffer(id, s)
+
 		return req.Id, req.Path, req.MachineId, nil
 	}
 }
@@ -1141,38 +1060,49 @@ func (app *Follower) SniffBridge(bridgeId string, id string) (string, string, st
 		return "", "", "", errors.New(bridgeId + " ID doesn't exist")
 	}
 
+	if _, err := app.redirectManager.GetSniffer(id); err == nil {
+		return "", "", "", errors.New("Already sniffing with " + id)
+	}
+
 	if b.MachineId == app.GetMachineId() {
-		if _, ok = app.sniffers[id]; ok {
-			return "", "", "", errors.New("Already sniffing with " + id)
-		}
+
 		if b.Router == nil {
-			return "", "", "", errors.New(bridgeId + "is not connected to any router")
+			return "", "", "", errors.New(id + "is not connected to any router")
 		}
 
-		if _, ok = b.RouterLink.NetworkBILink.Left.GetShaper().(*network.NetworkShaper); !ok {
+		if isSpecialLink(b.RouterLink.ConnectsFrom) {
 			return "", "", "", errors.New("already performing an operation on this link")
-		} else if _, ok = b.RouterLink.NetworkBILink.Right.GetShaper().(*network.NetworkShaper); !ok {
+		} else if isSpecialLink(b.RouterLink.ConnectsTo) {
 			return "", "", "", errors.New("already performing an operation on this link")
 		}
 
-		redirect, err := redirecttraffic.NewRedirectionSocket(bridgeId, sniffSocketPath(id))
+		redirect, err := redirecttraffic.NewRedirectionSocket(id, sniffSocketPath(id))
+
 		if err != nil {
 			return "", "", "", err
 
 		}
 
+		sniffComponent := &redirecttraffic.SniffComponent{
+			Id:        id,
+			MachineId: app.GetMachineId(),
+			Socket:    redirect,
+			Component: b.RouterLink,
+		}
+		app.redirectManager.AddSniffer(id, sniffComponent)
+
 		b.RouterLink.NetworkBILink.Left.Stop()
 		b.RouterLink.NetworkBILink.Right.Stop()
 
-		newSniff := b.RouterLink.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(redirect)
+		newSniff := b.RouterLink.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		b.RouterLink.NetworkBILink.Left.SetShaper(newSniff)
 		b.RouterLink.NetworkBILink.Left.Start()
 
-		newSniff = b.RouterLink.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(redirect)
+		newSniff = b.RouterLink.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		b.RouterLink.NetworkBILink.Right.SetShaper(newSniff)
 		b.RouterLink.NetworkBILink.Right.Start()
 
-		app.sniffers[id] = redirect
+		go redirect.Start()
 
 		return id, redirect.GetSocketPath(), b.MachineId, nil
 
@@ -1198,6 +1128,14 @@ func (app *Follower) SniffBridge(bridgeId string, id string) (string, string, st
 			return "", "", "", errors.New(req.Error.ErrMsg)
 		}
 
+		s := &redirecttraffic.SniffComponent{
+			Id:        id,
+			MachineId: b.MachineId,
+			Socket:    nil,
+			Component: nil,
+		}
+		app.redirectManager.AddSniffer(id, s)
+
 		return req.Id, req.Path, req.MachineId, nil
 	}
 }
@@ -1215,19 +1153,20 @@ func (app *Follower) SniffRouters(router1 string, router2 string, id string) (st
 		return "", "", "", errors.New(router2 + " ID doesn't exist")
 	}
 
+	if _, err := app.redirectManager.GetSniffer(id); err == nil {
+		return "", "", "", errors.New("Already sniffing with " + id)
+	}
+
 	if r1.MachineId == app.GetMachineId() {
 		if r2.MachineId == app.GetMachineId() {
-			if _, ok = app.sniffers[id]; ok {
-				return "", "", "", errors.New("already sniffing with " + id)
-			}
 			link, ok := r1.RouterLinks[router2]
 			if !ok {
 				return "", "", "", errors.New(router1 + " and " + router2 + "are not connected")
 			}
 
-			if _, ok = link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper); !ok {
+			if isSpecialLink(link.ConnectsFrom) {
 				return "", "", "", errors.New("already performing an operation on this link")
-			} else if _, ok = link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper); !ok {
+			} else if isSpecialLink(link.ConnectsTo) {
 				return "", "", "", errors.New("already performing an operation on this link")
 			}
 
@@ -1237,18 +1176,27 @@ func (app *Follower) SniffRouters(router1 string, router2 string, id string) (st
 
 			}
 
+			sniffComponent := &redirecttraffic.SniffComponent{
+				Id:        id,
+				MachineId: app.GetMachineId(),
+				Socket:    redirect,
+				Component: link,
+			}
+
+			app.redirectManager.AddSniffer(id, sniffComponent)
+
 			link.NetworkBILink.Left.Stop()
 			link.NetworkBILink.Right.Stop()
 
-			newSniff := link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(redirect)
+			newSniff := link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 			link.NetworkBILink.Left.SetShaper(newSniff)
 			link.NetworkBILink.Left.Start()
 
-			newSniff = link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(redirect)
+			newSniff = link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 			link.NetworkBILink.Right.SetShaper(newSniff)
 			link.NetworkBILink.Right.Start()
 
-			app.sniffers[id] = redirect
+			go redirect.Start()
 
 			return id, redirect.GetSocketPath(), r1.MachineId, nil
 		} else {
@@ -1282,62 +1230,96 @@ func (app *Follower) SniffRouters(router1 string, router2 string, id string) (st
 				return "", "", "", errors.New(req.Error.ErrMsg)
 			}
 
+			s := &redirecttraffic.SniffComponent{
+				Id:        id,
+				MachineId: r2.MachineId,
+				Socket:    nil,
+				Component: nil,
+			}
+
+			app.redirectManager.AddSniffer(id, s)
+
 			return req.Id, req.Path, req.MachineId, nil
 		}
 	}
 }
-func (app *Follower) InterceptNode(id string, direction bool) (string, string, string, error) {
 
-	n, ok := app.topo.GetNode(id)
+func (app *Follower) InterceptNode(nodeId string, id string, direction bool) (string, string, string, error) {
+
+	n, ok := app.topo.GetNode(nodeId)
 
 	if !ok {
-		return "", "", "", errors.New(id + " ID doesn't exist")
+		return "", "", "", errors.New(nodeId + " ID doesn't exist")
 	}
-	interceptId := getInterceptId(id, direction)
+
+	if _, err := app.redirectManager.GetIntercept(id); err == nil {
+		return "", "", "", errors.New("Already intercepting with " + id)
+	}
 
 	if n.MachineId == app.GetMachineId() {
-		if _, ok = app.intercepts[interceptId]; ok {
-			return "", "", "", errors.New("Already intercepting" + interceptId)
-		}
+
 		if n.Bridge == nil {
-			return "", "", "", errors.New(id + "is not connected to any bridge")
+			return "", "", "", errors.New(nodeId + "is not connected to any bridge")
 		}
 
-		if _, ok = n.Link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper); !ok {
-			return "", "", "", errors.New("already performing an operation on this link")
-		} else if _, ok = n.Link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper); !ok {
-			return "", "", "", errors.New("already performing an operation on this link")
-		}
-
-		redirect, err := redirecttraffic.NewRedirectionSocket(interceptId, interceptSocketPath(interceptId))
-		if err != nil {
-			return "", "", "", err
-
-		}
+		var interceptComponent *redirecttraffic.InterceptComponent
 
 		if direction {
 
+			if isSpecialLink(n.Link.ConnectsFrom) {
+				return "", "", "", errors.New("already performing an operation on this link")
+			}
+			redirect, err := redirecttraffic.NewRedirectionSocket(id, interceptSocketPath(id))
+			if err != nil {
+				return "", "", "", err
+			}
+			interceptComponent = &redirecttraffic.InterceptComponent{
+				Id:        id,
+				MachineId: app.GetMachineId(),
+				Socket:    redirect,
+				Component: n.Link.ConnectsFrom,
+			}
+
 			n.Link.NetworkBILink.Left.Stop()
 
-			intercept := n.Link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(redirect)
+			intercept := n.Link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			n.Link.NetworkBILink.Left.SetShaper(intercept)
 			n.Link.NetworkBILink.Left.Start()
 		} else {
+
+			if isSpecialLink(n.Link.ConnectsTo) {
+				return "", "", "", errors.New("already performing an operation on this link")
+			}
+
+			redirect, err := redirecttraffic.NewRedirectionSocket(id, interceptSocketPath(id))
+			if err != nil {
+				return "", "", "", err
+			}
+			interceptComponent = &redirecttraffic.InterceptComponent{
+				Id:        id,
+				MachineId: app.GetMachineId(),
+				Socket:    redirect,
+				Component: n.Link.ConnectsTo,
+			}
+
 			n.Link.NetworkBILink.Right.Stop()
-			intercept := n.Link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(redirect)
+			intercept := n.Link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			n.Link.NetworkBILink.Right.SetShaper(intercept)
 			n.Link.NetworkBILink.Right.Start()
 
 		}
 
-		app.intercepts[getInterceptId(id, direction)] = redirect
-		go redirect.Start()
+		app.redirectManager.AddIntercept(id, interceptComponent)
 
-		return id, redirect.GetSocketPath(), n.MachineId, nil
+		go interceptComponent.Socket.Start()
+
+		return id, interceptComponent.Socket.GetSocketPath(), n.MachineId, nil
 
 	} else {
 		body := &opApi.InterceptNodeRequest{
-			Name: id,
+			Node:      nodeId,
+			Id:        id,
+			Direction: direction,
 		}
 		resp, err := app.cl.SendMsg(n.MachineId, body, "interceptNode")
 		if err != nil {
@@ -1356,58 +1338,97 @@ func (app *Follower) InterceptNode(id string, direction bool) (string, string, s
 			return "", "", "", errors.New(req.Error.ErrMsg)
 		}
 
+		interceptComponent := &redirecttraffic.InterceptComponent{
+			Id:        id,
+			MachineId: n.MachineId,
+			Socket:    nil,
+			Component: nil,
+		}
+
+		app.redirectManager.AddIntercept(id, interceptComponent)
+
 		return req.Id, req.Path, req.MachineId, nil
 	}
 }
 
-func (app *Follower) InterceptBridge(id string, direction bool) (string, string, string, error) {
+func (app *Follower) InterceptBridge(bridgeId string, id string, direction bool) (string, string, string, error) {
 
-	b, ok := app.topo.GetBridge(id)
+	b, ok := app.topo.GetBridge(bridgeId)
 
 	if !ok {
-		return "", "", "", errors.New(id + " ID doesn't exist")
+		return "", "", "", errors.New(bridgeId + " ID doesn't exist")
 	}
 
-	interceptId := getInterceptId(id, direction)
+	if _, err := app.redirectManager.GetIntercept(id); err == nil {
+		return "", "", "", errors.New("Already intercepting with " + id)
+	}
 
 	if b.MachineId == app.GetMachineId() {
-		if _, ok = app.intercepts[interceptId]; ok {
-			return "", "", "", errors.New("Already intercepting" + getInterceptId(id, direction))
-		}
+
 		if b.Router == nil {
-			return "", "", "", errors.New(id + "is not connected to any router")
+			return "", "", "", errors.New(bridgeId + "is not connected to any router")
 		}
 
-		redirect, err := redirecttraffic.NewRedirectionSocket(interceptId, interceptSocketPath(interceptId))
-		if err != nil {
-			return "", "", "", err
-
-		}
+		var interceptComponent *redirecttraffic.InterceptComponent
 
 		if direction {
 
+			if isSpecialLink(b.RouterLink.ConnectsFrom) {
+				return "", "", "", errors.New("already performing an operation on this link")
+			}
+
+			redirect, err := redirecttraffic.NewRedirectionSocket(id, interceptSocketPath(id))
+			if err != nil {
+				return "", "", "", err
+			}
+
+			interceptComponent = &redirecttraffic.InterceptComponent{
+				Id:        id,
+				MachineId: app.GetMachineId(),
+				Socket:    redirect,
+				Component: b.RouterLink.ConnectsFrom,
+			}
 			b.RouterLink.NetworkBILink.Left.Stop()
 
-			intercept := b.RouterLink.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(redirect)
+			intercept := b.RouterLink.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			b.RouterLink.NetworkBILink.Left.SetShaper(intercept)
 			b.RouterLink.NetworkBILink.Left.Start()
 
 		} else {
+
+			if isSpecialLink(b.RouterLink.ConnectsTo) {
+				return "", "", "", errors.New("already performing an operation on this link")
+			}
+			redirect, err := redirecttraffic.NewRedirectionSocket(id, interceptSocketPath(id))
+			if err != nil {
+				return "", "", "", err
+			}
+
+			interceptComponent = &redirecttraffic.InterceptComponent{
+				Id:        id,
+				MachineId: app.GetMachineId(),
+				Socket:    redirect,
+				Component: b.RouterLink.ConnectsTo,
+			}
+
 			b.RouterLink.NetworkBILink.Right.Stop()
 
-			intercept := b.RouterLink.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(redirect)
+			intercept := b.RouterLink.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			b.RouterLink.NetworkBILink.Right.SetShaper(intercept)
 			b.RouterLink.NetworkBILink.Right.Start()
 		}
 
-		app.intercepts[interceptId] = redirect
-		go redirect.Start()
+		app.redirectManager.AddIntercept(id, interceptComponent)
 
-		return id, redirect.GetSocketPath(), b.MachineId, nil
+		go interceptComponent.Socket.Start()
+
+		return id, interceptComponent.Socket.GetSocketPath(), b.MachineId, nil
 
 	} else {
 		body := &opApi.InterceptBridgeRequest{
-			Name: id,
+			Bridge:    bridgeId,
+			Id:        id,
+			Direction: direction,
 		}
 		resp, err := app.cl.SendMsg(b.MachineId, body, "interceptBridge")
 		if err != nil {
@@ -1426,11 +1447,20 @@ func (app *Follower) InterceptBridge(id string, direction bool) (string, string,
 			return "", "", "", errors.New(req.Error.ErrMsg)
 		}
 
+		interceptComponent := redirecttraffic.InterceptComponent{
+			Id:        id,
+			MachineId: b.MachineId,
+			Socket:    nil,
+			Component: nil,
+		}
+
+		app.redirectManager.AddIntercept(id, &interceptComponent)
+
 		return req.Id, req.Path, req.MachineId, nil
 	}
 }
 
-func (app *Follower) InterceptRouters(router1 string, router2 string, direction bool) (string, string, string, error) {
+func (app *Follower) InterceptRouters(router1 string, router2 string, id string, direction bool) (string, string, string, error) {
 
 	r1, ok := app.topo.GetRouter(router1)
 
@@ -1444,45 +1474,125 @@ func (app *Follower) InterceptRouters(router1 string, router2 string, direction 
 		return "", "", "", errors.New(router2 + " ID doesn't exist")
 	}
 
+	if _, err := app.redirectManager.GetIntercept(id); err == nil {
+		return "", "", "", errors.New("Already intercepting with " + id)
+	}
+
 	if r1.MachineId == app.GetMachineId() {
 		if r2.MachineId == app.GetMachineId() {
-			if _, ok = app.intercepts[getInterceptId(router1+"-"+router2, direction)]; ok {
-				return "", "", "", errors.New("already intercepting " + getInterceptId(router1+"-"+router2, direction))
-			}
-			if _, ok = app.intercepts[getInterceptId(router2+"-"+router1, direction)]; ok {
-				return "", "", "", errors.New("already intercepting " + getInterceptId(router1+"-"+router2, direction))
-			}
+
 			link, ok := r1.RouterLinks[router2]
 			if !ok {
 				return "", "", "", errors.New(router1 + " and " + router2 + "are not connected")
 			}
 
-			interceptId := getInterceptId(router1+"-"+router2, direction)
+			var interceptComponent *redirecttraffic.InterceptComponent
 
-			redirect, err := redirecttraffic.NewRedirectionSocket(interceptId, interceptSocketPath(interceptId))
-			if err != nil {
-				return "", "", "", err
+			if link.To.ID() == r2.ID() {
 
-			}
+				if direction {
+					if isSpecialLink(link.ConnectsFrom) {
+						return "", "", "", errors.New("already performing an operation on this link")
+					}
 
-			if link.To.ID() == r2.ID() && direction {
+					redirect, err := redirecttraffic.NewRedirectionSocket(id, interceptSocketPath(id))
 
-				link.ConnectsTo.NetworkLink.Stop()
+					if err != nil {
+						return "", "", "", err
 
-				intercept := link.ConnectsTo.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(redirect)
-				link.ConnectsTo.NetworkLink.SetShaper(intercept)
-				link.ConnectsTo.NetworkLink.Start()
+					}
+
+					interceptComponent = &redirecttraffic.InterceptComponent{
+						Id:        id,
+						MachineId: app.GetMachineId(),
+						Socket:    redirect,
+						Component: link.ConnectsFrom,
+					}
+
+					link.ConnectsFrom.NetworkLink.Stop()
+
+					intercept := link.ConnectsFrom.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
+					link.ConnectsFrom.NetworkLink.SetShaper(intercept)
+					link.ConnectsFrom.NetworkLink.Start()
+
+				} else {
+					if isSpecialLink(link.ConnectsTo) {
+						return "", "", "", errors.New("already performing an operation on this link")
+					}
+					redirect, err := redirecttraffic.NewRedirectionSocket(id, interceptSocketPath(id))
+
+					if err != nil {
+						return "", "", "", err
+
+					}
+
+					interceptComponent = &redirecttraffic.InterceptComponent{
+						Id:        id,
+						MachineId: app.GetMachineId(),
+						Socket:    redirect,
+						Component: link.ConnectsTo,
+					}
+
+					link.ConnectsTo.NetworkLink.Stop()
+
+					intercept := link.ConnectsTo.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
+					link.ConnectsTo.NetworkLink.SetShaper(intercept)
+					link.ConnectsTo.NetworkLink.Start()
+				}
 			} else {
-				link.ConnectsFrom.NetworkLink.Stop()
-				intercept := link.ConnectsFrom.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(redirect)
-				link.ConnectsFrom.NetworkLink.SetShaper(intercept)
-				link.ConnectsTo.NetworkLink.Start()
+				if direction {
+					if isSpecialLink(link.ConnectsTo) {
+						return "", "", "", errors.New("already performing an operation on this link")
+					}
+					redirect, err := redirecttraffic.NewRedirectionSocket(id, interceptSocketPath(id))
+
+					if err != nil {
+						return "", "", "", err
+
+					}
+
+					interceptComponent = &redirecttraffic.InterceptComponent{
+						Id:        id,
+						MachineId: app.GetMachineId(),
+						Socket:    redirect,
+						Component: link.ConnectsTo,
+					}
+
+					link.ConnectsTo.NetworkLink.Stop()
+
+					intercept := link.ConnectsTo.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
+					link.ConnectsTo.NetworkLink.SetShaper(intercept)
+					link.ConnectsTo.NetworkLink.Start()
+				} else {
+					if isSpecialLink(link.ConnectsFrom) {
+						return "", "", "", errors.New("already performing an operation on this link")
+					}
+
+					redirect, err := redirecttraffic.NewRedirectionSocket(id, interceptSocketPath(id))
+
+					if err != nil {
+						return "", "", "", err
+
+					}
+
+					interceptComponent = &redirecttraffic.InterceptComponent{
+						Id:        id,
+						MachineId: app.GetMachineId(),
+						Socket:    redirect,
+						Component: link.ConnectsFrom,
+					}
+
+					link.ConnectsFrom.NetworkLink.Stop()
+
+					intercept := link.ConnectsFrom.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
+					link.ConnectsFrom.NetworkLink.SetShaper(intercept)
+					link.ConnectsFrom.NetworkLink.Start()
+				}
 			}
 
-			app.intercepts[interceptId] = redirect
-			go redirect.Start()
+			go interceptComponent.Socket.Start()
 
-			return router1 + "-" + router2, redirect.GetSocketPath(), r1.MachineId, nil
+			return id, interceptComponent.Socket.GetSocketPath(), r1.MachineId, nil
 		} else {
 			return "", "", "", errors.New("can't intercept traffic between remote routers")
 		}
@@ -1513,218 +1623,40 @@ func (app *Follower) InterceptRouters(router1 string, router2 string, direction 
 				return "", "", "", errors.New(req.Error.ErrMsg)
 			}
 
+			interceptComponent := &redirecttraffic.InterceptComponent{
+				Id:        id,
+				MachineId: r1.MachineId,
+				Socket:    nil,
+				Component: nil,
+			}
+
+			app.redirectManager.AddIntercept(id, interceptComponent)
+
 			return req.Id, req.Path, req.MachineId, nil
 		}
 	}
 }
 
-func (app *Follower) StopInterceptNode(id string, direction bool) error {
-
-	n, ok := app.topo.GetNode(id)
-
-	if !ok {
-		return errors.New(id + " ID doesn't exist")
-	}
-
-	if n.MachineId == app.GetMachineId() {
-		var redirect *redirecttraffic.RedirectionSocket
-		if redirect, ok = app.intercepts[getInterceptId(id, direction)]; !ok {
-			return errors.New("not intercepting traffic in this node")
-		}
-
-		if n.Bridge == nil {
-			app.intercepts[getInterceptId(id, direction)].Stop()
-			delete(app.intercepts, getInterceptId(id, direction))
-			return errors.New(id + "is not connected to any bridge")
-		}
-
-		if direction {
-			n.Link.NetworkBILink.Left.Stop()
-
-			networkShaper := n.Link.NetworkBILink.Left.GetShaper().(*network.InterceptShaper).ConvertToNetworkShaper()
-			n.Link.NetworkBILink.Left.SetShaper(networkShaper)
-			n.Link.NetworkBILink.Left.Start()
-		} else {
-			n.Link.NetworkBILink.Right.Stop()
-
-			networkShaper := n.Link.NetworkBILink.Right.GetShaper().(*network.InterceptShaper).ConvertToNetworkShaper()
-			n.Link.NetworkBILink.Right.SetShaper(networkShaper)
-			n.Link.NetworkBILink.Right.Start()
-
-		}
-
-		delete(app.intercepts, getInterceptId(id, direction))
-		redirect.Stop()
-
-		return nil
-
+func (app *Follower) StopIntercept(id string) error {
+	if s, err := app.redirectManager.GetIntercept(id); err == nil {
+		return err
 	} else {
-		body := &opApi.StopInterceptRequest{
-			Id: id,
-		}
-		resp, err := app.cl.SendMsg(n.MachineId, body, "stopInterceptNode")
-		if err != nil {
-			return err
-		}
-
-		d := json.NewDecoder(resp.Body)
-		req := &opApi.StopInterceptResponse{}
-		err = d.Decode(&req)
-
-		if err != nil {
-			return err
-		}
-
-		if req.Error.ErrCode != 0 {
-			return errors.New(req.Error.ErrMsg)
-		}
-
-		return nil
-	}
-}
-
-func (app *Follower) StopInterceptBridge(id string, direction bool) error {
-	b, ok := app.topo.GetBridge(id)
-
-	if !ok {
-		return errors.New(id + " ID doesn't exist")
-	}
-
-	if b.MachineId == app.GetMachineId() {
-		var redirect *redirecttraffic.RedirectionSocket
-		if redirect, ok = app.intercepts[getInterceptId(id, direction)]; !ok {
-			return errors.New("not intercepting traffic in this bridge")
-		}
-
-		if b.Router == nil {
-			app.intercepts[getInterceptId(id, direction)].Stop()
-			delete(app.intercepts, getInterceptId(id, direction))
-			return errors.New(id + "is not connected to any router")
-		}
-
-		if direction {
-			b.RouterLink.NetworkBILink.Left.Stop()
-
-			networkShaper := b.RouterLink.NetworkBILink.Left.GetShaper().(*network.InterceptShaper).ConvertToNetworkShaper()
-			b.RouterLink.NetworkBILink.Left.SetShaper(networkShaper)
-			b.RouterLink.NetworkBILink.Left.Start()
-
+		if app.GetMachineId() == s.MachineId {
+			err = app.clearInterceptLink(id)
+			if err != nil {
+				return err
+			}
 		} else {
-			b.RouterLink.NetworkBILink.Right.Stop()
-
-			networkShaper := b.RouterLink.NetworkBILink.Right.GetShaper().(*network.InterceptShaper).ConvertToNetworkShaper()
-			b.RouterLink.NetworkBILink.Right.SetShaper(networkShaper)
-			b.RouterLink.NetworkBILink.Right.Start()
-		}
-
-		delete(app.intercepts, getInterceptId(id, direction))
-		redirect.Stop()
-
-		return nil
-
-	} else {
-		body := &opApi.StopInterceptRequest{
-			Id: id,
-		}
-		resp, err := app.cl.SendMsg(b.MachineId, body, "stopInterceptBridge")
-		if err != nil {
-			return err
-		}
-
-		d := json.NewDecoder(resp.Body)
-		req := &opApi.StopInterceptResponse{}
-		err = d.Decode(&req)
-
-		if err != nil {
-			return err
-		}
-
-		if req.Error.ErrCode != 0 {
-			return errors.New(req.Error.ErrMsg)
-		}
-
-		return nil
-
-	}
-}
-
-func (app *Follower) StopInterceptRouters(id string, direction bool) error {
-
-	routers := strings.Split(id, "-")
-
-	if len(routers) != 2 {
-		return errors.New("invalid id")
-	}
-
-	r1, ok := app.topo.GetRouter(routers[0])
-
-	if !ok {
-		return errors.New(routers[0] + " ID doesn't exist")
-	}
-
-	r2, ok := app.topo.GetRouter(routers[1])
-
-	if !ok {
-		return errors.New(routers[1] + " ID doesn't exist")
-	}
-
-	if r1.MachineId == app.GetMachineId() {
-		if r2.MachineId == app.GetMachineId() {
-			var redirect *redirecttraffic.RedirectionSocket
-			if redirect, ok = app.intercepts[getInterceptId(r1.ID()+"-"+r2.ID(), direction)]; !ok {
-				return errors.New("not intercepting traffic between" + r1.ID() + " and " + r2.ID())
-
-			} else {
-				delete(app.intercepts, getInterceptId(r1.ID()+"-"+r2.ID(), direction))
-				redirect.Stop()
-			}
-			if redirect, ok = app.intercepts[getInterceptId(r2.ID()+"-"+r1.ID(), direction)]; !ok {
-				return errors.New("not intercepting traffic between" + r1.ID() + " and " + r2.ID())
-
-			} else {
-				delete(app.intercepts, getInterceptId(r2.ID()+"-"+r1.ID(), direction))
-				redirect.Stop()
-			}
-
-			link, ok := r1.RouterLinks[r2.ID()]
-			if !ok {
-				return errors.New(r1.ID() + " and " + r2.ID() + "are not connected")
-			}
-
-			if link.To.ID() == r2.ID() && direction {
-
-				link.ConnectsTo.NetworkLink.Stop()
-
-				networkShaper := link.ConnectsTo.NetworkLink.GetShaper().(*network.InterceptShaper).ConvertToNetworkShaper()
-				link.ConnectsTo.NetworkLink.SetShaper(networkShaper)
-				link.ConnectsTo.NetworkLink.Start()
-			} else {
-				link.ConnectsFrom.NetworkLink.Stop()
-
-				networkShaper := link.ConnectsFrom.NetworkLink.GetShaper().(*network.InterceptShaper).ConvertToNetworkShaper()
-				link.ConnectsFrom.NetworkLink.SetShaper(networkShaper)
-				link.ConnectsTo.NetworkLink.Start()
-			}
-			return nil
-		} else {
-			return errors.New("can't intercept traffic between remote routers")
-		}
-
-	} else {
-		if r2.MachineId == app.GetMachineId() {
-			return errors.New("can't intercept traffic between remote routers")
-		} else {
-
 			body := &opApi.StopInterceptRequest{
 				Id: id,
 			}
-			resp, err := app.cl.SendMsg(r1.MachineId, body, "stopInterceptRouters")
+			resp, err := app.cl.SendMsg(s.MachineId, body, "stopIntercept")
 			if err != nil {
 				return err
 			}
 
 			d := json.NewDecoder(resp.Body)
-			req := &opApi.StopInterceptResponse{}
+			req := &opApi.StopSniffResponse{}
 			err = d.Decode(&req)
 
 			if err != nil {
@@ -1735,22 +1667,32 @@ func (app *Follower) StopInterceptRouters(id string, direction bool) error {
 				return errors.New(req.Error.ErrMsg)
 			}
 
-			return nil
+			app.redirectManager.RemoveIntercept(id)
 		}
 	}
+	return nil
 }
 
-func (app *Follower) ListIntercepts() []string {
+func (app *Follower) ListIntercepts() []api.InterceptComponent {
 
-	ids := make([]string, 0, len(app.intercepts))
+	intercepts := app.redirectManager.ListIntercepts()
 
-	for id := range app.intercepts {
-		ids = append(ids, id)
+	list := make([]api.InterceptComponent, len(intercepts))
+
+	for id, s := range intercepts {
+		link := s.Component.(*topology.BiLink)
+		list = append(list, api.InterceptComponent{
+			Id:        id,
+			MachineId: s.MachineId,
+			To:        link.ConnectsTo.ID(),
+			From:      link.ConnectsFrom.ID(),
+			Path:      s.Socket.GetSocketPath(),
+		})
 	}
 
-	return ids
-
+	return list
 }
+
 func (app *Follower) Pause(id string, all bool) error {
 	if all {
 		app.dm.PauseAll()
