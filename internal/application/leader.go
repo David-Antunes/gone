@@ -50,14 +50,28 @@ func (app *Leader) GetMachineId() string {
 	return app.dm.GetMachineId()
 }
 
-func (app *Leader) GetNode(id string) (*topology.Node, bool) {
-	return app.topo.GetNode(id)
+func (app *Leader) GetNode(id string) (api.Node, bool) {
+	if n, ok := app.topo.GetNode(id); ok {
+		return convertToAPINode(n), true
+	} else {
+		return api.Node{}, false
+	}
 }
-func (app *Leader) GetBridge(id string) (*topology.Bridge, bool) {
-	return app.topo.GetBridge(id)
+
+func (app *Leader) GetBridge(id string) (api.Bridge, bool) {
+
+	if b, ok := app.topo.GetBridge(id); ok {
+		return convertToAPIBridge(b), true
+	} else {
+		return api.Bridge{}, false
+	}
 }
-func (app *Leader) GetRouter(id string) (*topology.Router, bool) {
-	return app.topo.GetRouter(id)
+func (app *Leader) GetRouter(id string) (api.Router, bool) {
+	if r, ok := app.topo.GetRouter(id); ok {
+		return convertToAPIRouter(r), true
+	} else {
+		return api.Router{}, false
+	}
 }
 
 func (app *Leader) GetRouterWeights(id string) map[string]topology.Weight {

@@ -3,6 +3,7 @@ package leader
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/David-Antunes/gone/api"
 	addApi "github.com/David-Antunes/gone/api/Add"
 	connectApi "github.com/David-Antunes/gone/api/Connect"
 	disconnectApi "github.com/David-Antunes/gone/api/Disconnect"
@@ -11,7 +12,6 @@ import (
 	removeApi "github.com/David-Antunes/gone/api/Remove"
 	"github.com/David-Antunes/gone/internal/daemon"
 	"log"
-	"net"
 	"net/http"
 	"os"
 )
@@ -622,7 +622,7 @@ func inspectNode(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("inspectNode:", err)
 		daemon.SendError(w, &inspectApi.InspectNodeResponse{
-			Name: req.Name,
+			Node: api.Node{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -633,38 +633,17 @@ func inspectNode(w http.ResponseWriter, r *http.Request) {
 
 	if node, ok := engine.app.GetNode(req.Name); ok {
 		if node.MachineId == engine.app.GetMachineId() {
-			if node.Bridge != nil {
-				if node.Bridge.Router != nil {
-					daemon.SendResponse(w, inspectApi.InspectNodeResponse{
-						Name:      node.ID(),
-						Bridge:    node.Bridge.ID(),
-						Router:    node.Bridge.Router.ID(),
-						MachineId: node.MachineId,
-						Error:     apiErrors.Error{},
-					})
-					return
-				} else {
-					daemon.SendResponse(w, inspectApi.InspectNodeResponse{
-						Name:      node.ID(),
-						Bridge:    node.Bridge.ID(),
-						MachineId: node.MachineId,
-						Error:     apiErrors.Error{},
-					})
-					return
-				}
-			}
 			daemon.SendResponse(w, inspectApi.InspectNodeResponse{
-				Name:      node.ID(),
-				MachineId: node.MachineId,
-				Error:     apiErrors.Error{},
+				Node:  node,
+				Error: apiErrors.Error{},
 			})
+			return
 		} else {
 			msg, err := engine.cd.Cl.SendMsg(node.MachineId, req, "inspectNode")
-
 			if err != nil {
 				daemonLog.Println("inspectNode:", err)
 				daemon.SendError(w, &inspectApi.InspectNodeResponse{
-					Name: req.Name,
+					Node: api.Node{},
 					Error: apiErrors.Error{
 						ErrCode: 1,
 						ErrMsg:  err.Error(),
@@ -678,7 +657,7 @@ func inspectNode(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				daemonLog.Println("inspectNode:", err)
 				daemon.SendError(w, &inspectApi.InspectNodeResponse{
-					Name: req.Name,
+					Node: api.Node{},
 					Error: apiErrors.Error{
 						ErrCode: 1,
 						ErrMsg:  err.Error(),
@@ -692,7 +671,7 @@ func inspectNode(w http.ResponseWriter, r *http.Request) {
 	} else {
 		daemonLog.Println("inspectNode: Invalid node id")
 		daemon.SendError(w, &inspectApi.InspectNodeResponse{
-			Name: req.Name,
+			Node: api.Node{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  "Node doesn't exist.",
@@ -709,7 +688,7 @@ func inspectBridge(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("inspectBridge:", err)
 		daemon.SendError(w, &inspectApi.InspectBridgeResponse{
-			Name: req.Name,
+			Bridge: api.Bridge{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -720,40 +699,18 @@ func inspectBridge(w http.ResponseWriter, r *http.Request) {
 
 	if bridge, ok := engine.app.GetBridge(req.Name); ok {
 		if bridge.MachineId == engine.app.GetMachineId() {
-
-			connectedNodes := make([]inspectApi.BridgeNode, 0, len(bridge.ConnectedNodes))
-
-			for _, node := range bridge.ConnectedNodes {
-				connectedNodes = append(connectedNodes, inspectApi.BridgeNode{
-					Id:  node.ID(),
-					Mac: net.HardwareAddr(node.NetworkNode.GetMac()).String(),
-				})
-			}
-			if bridge.Router != nil {
-				daemon.SendResponse(w, inspectApi.InspectBridgeResponse{
-					Name:      bridge.ID(),
-					RouterId:  bridge.Router.ID(),
-					Nodes:     connectedNodes,
-					MachineId: bridge.MachineId,
-					Error:     apiErrors.Error{},
-				})
-				return
-			} else {
-				daemon.SendResponse(w, inspectApi.InspectBridgeResponse{
-					Name:      bridge.ID(),
-					Nodes:     connectedNodes,
-					MachineId: bridge.MachineId,
-					Error:     apiErrors.Error{},
-				})
-				return
-			}
+			daemon.SendResponse(w, inspectApi.InspectBridgeResponse{
+				Bridge: bridge,
+				Error:  apiErrors.Error{},
+			})
+			return
 		} else {
 			msg, err := engine.cd.Cl.SendMsg(bridge.MachineId, req, "inspectBridge")
 
 			if err != nil {
 				daemonLog.Println("inspectBridge:", err)
 				daemon.SendError(w, &inspectApi.InspectBridgeResponse{
-					Name: req.Name,
+					Bridge: api.Bridge{},
 					Error: apiErrors.Error{
 						ErrCode: 1,
 						ErrMsg:  err.Error(),
@@ -767,7 +724,7 @@ func inspectBridge(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				daemonLog.Println("inspectBridge:", err)
 				daemon.SendError(w, &inspectApi.InspectBridgeResponse{
-					Name: req.Name,
+					Bridge: bridge,
 					Error: apiErrors.Error{
 						ErrCode: 1,
 						ErrMsg:  err.Error(),
@@ -780,7 +737,7 @@ func inspectBridge(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Println("Invalid bridge id.")
 		daemon.SendError(w, &inspectApi.InspectBridgeResponse{
-			Name: req.Name,
+			Bridge: api.Bridge{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  "Invalid bridge id.",
@@ -797,7 +754,7 @@ func inspectRouter(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("inspectRouter:", err)
 		daemon.SendError(w, &inspectApi.InspectRouterResponse{
-			Name: req.Name,
+			Router: api.Router{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -809,46 +766,18 @@ func inspectRouter(w http.ResponseWriter, r *http.Request) {
 	if router, ok := engine.app.GetRouter(req.Name); ok {
 		if router.MachineId == engine.app.GetMachineId() {
 
-			connectedBridges := make([]string, 0, len(router.ConnectedBridges))
-			connectedNodes := make(map[string][]string)
-
-			for id, bridge := range router.ConnectedBridges {
-				connectedBridges = append(connectedBridges, id)
-				connectedNodes[id] = make([]string, 0, len(bridge.ConnectedNodes))
-
-				for _, node := range bridge.ConnectedNodes {
-					connectedNodes[id] = append(connectedNodes[id], node.ID())
-				}
-			}
-
-			connectedRouters := make([]string, 0, len(router.ConnectedRouters))
-
-			for connectedRouter := range router.ConnectedRouters {
-				connectedRouters = append(connectedRouters, connectedRouter)
-			}
-
-			weights := make(map[string]string, len(router.Weights))
-			for id, weight := range router.Weights {
-				weights[net.HardwareAddr(id).String()] = weight.Router
-			}
-
 			daemon.SendResponse(w, inspectApi.InspectRouterResponse{
-				Name:      router.ID(),
-				MachineId: router.MachineId,
-				Bridges:   connectedBridges,
-				Nodes:     connectedNodes,
-				Routers:   connectedRouters,
-				Weights:   weights,
-				Error:     apiErrors.Error{},
+				Router: router,
+				Error:  apiErrors.Error{},
 			})
+			return
 		} else {
-
 			msg, err := engine.cd.Cl.SendMsg(router.MachineId, req, "inspectRouter")
 
 			if err != nil {
 				daemonLog.Println("inspectRouter:", err)
 				daemon.SendError(w, &inspectApi.InspectRouterResponse{
-					Name: req.Name,
+					Router: api.Router{},
 					Error: apiErrors.Error{
 						ErrCode: 1,
 						ErrMsg:  err.Error(),
@@ -862,7 +791,7 @@ func inspectRouter(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				daemonLog.Println("inspectRouter:", err)
 				daemon.SendError(w, &inspectApi.InspectRouterResponse{
-					Name: req.Name,
+					Router: api.Router{},
 					Error: apiErrors.Error{
 						ErrCode: 1,
 						ErrMsg:  err.Error(),
@@ -875,7 +804,7 @@ func inspectRouter(w http.ResponseWriter, r *http.Request) {
 	} else {
 		daemonLog.Println("inspectRouter: Invalid router id")
 		daemon.SendError(w, &inspectApi.InspectRouterResponse{
-			Name: req.Name,
+			Router: api.Router{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  "Invalid router id.",

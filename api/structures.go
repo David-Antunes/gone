@@ -4,22 +4,22 @@ type Node struct {
 	Id        string
 	MachineId string
 	Bridge    string
-	BiLink    BiLink
+	Link      Link
 }
 
 type Bridge struct {
 	Id        string
 	MachineId string
-	BiLink    BiLink
+	Router    string
+	Link      Link
 	Nodes     []Node
 }
 
 type Router struct {
 	Id        string
 	MachineId string
-	Routers   []Router
+	Routers   map[string]Link
 	Bridges   []Bridge
-	BiLinks   map[string]BiLink
 	Weights   map[string]map[string]int
 }
 
@@ -35,10 +35,10 @@ type BiLink struct {
 }
 
 type LinkProps struct {
-	latency   int
-	bandwidth int
-	jitter    float64
-	dropRate  float64
+	Latency   int
+	Bandwidth int
+	Jitter    float64
+	DropRate  float64
 	Weight    int
 }
 

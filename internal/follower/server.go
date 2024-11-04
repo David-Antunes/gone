@@ -13,6 +13,7 @@ type server struct {
 	httpServer *http.Server
 	socket     net.Listener
 	app        *application.Follower
+	cd         *cluster.ClusterDaemon
 }
 
 var engine *server
@@ -76,7 +77,7 @@ func createDaemon(app *application.Follower, cd *cluster.ClusterDaemon, ipAddr s
 	httpServer := http.Server{
 		Handler: m,
 	}
-	return &server{&httpServer, socket, app}
+	return &server{&httpServer, socket, app, cd}
 }
 
 func Serve() {

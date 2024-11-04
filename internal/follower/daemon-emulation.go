@@ -1,18 +1,19 @@
 package follower
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/David-Antunes/gone/api"
 	addApi "github.com/David-Antunes/gone/api/Add"
 	connectApi "github.com/David-Antunes/gone/api/Connect"
 	disconnectApi "github.com/David-Antunes/gone/api/Disconnect"
 	apiErrors "github.com/David-Antunes/gone/api/Errors"
 	inspectApi "github.com/David-Antunes/gone/api/Inspect"
 	removeApi "github.com/David-Antunes/gone/api/Remove"
-	"github.com/David-Antunes/gone/internal/api"
+	internal "github.com/David-Antunes/gone/internal/api"
 	"github.com/David-Antunes/gone/internal/daemon"
 	"log"
-	"net"
 	"net/http"
 	"os"
 )
@@ -266,11 +267,11 @@ func connectBridgeToRouter(w http.ResponseWriter, r *http.Request) {
 
 func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 
-	req := &api.ConnectRouterToRouterRequest{}
+	req := &internal.ConnectRouterToRouterRequest{}
 
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("connectRouterToRouter:", err)
-		daemon.SendError(w, &api.ConnectRouterToRouterResponse{
+		daemon.SendError(w, &internal.ConnectRouterToRouterResponse{
 			R1:        "",
 			R2:        "",
 			MachineID: "",
@@ -285,7 +286,7 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 	linkProps, err := daemon.ParseLinkPropsInternal(req.Latency, req.Bandwidth, req.Jitter, req.DropRate, req.Weight)
 	if err != nil {
 		daemonLog.Println("connectRouterToRouter:", err)
-		daemon.SendError(w, &api.ConnectRouterToRouterResponse{
+		daemon.SendError(w, &internal.ConnectRouterToRouterResponse{
 			R1:        "",
 			R2:        "",
 			MachineID: "",
@@ -302,7 +303,7 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 
 			daemonLog.Println("connectRouterToRouter:", err)
-			daemon.SendError(w, api.ConnectRouterToRouterResponse{
+			daemon.SendError(w, internal.ConnectRouterToRouterResponse{
 				R1:        "",
 				R2:        "",
 				MachineID: "",
@@ -318,7 +319,7 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 
 			daemonLog.Println("connectRouterToRouter:", err)
-			daemon.SendError(w, api.ConnectRouterToRouterResponse{
+			daemon.SendError(w, internal.ConnectRouterToRouterResponse{
 				R1:        "",
 				R2:        "",
 				MachineID: "",
@@ -331,7 +332,7 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	daemon.SendResponse(w, &api.ConnectRouterToRouterResponse{
+	daemon.SendResponse(w, &internal.ConnectRouterToRouterResponse{
 		R1:        req.R1,
 		R2:        req.R2,
 		MachineID: req.MachineID,
@@ -343,11 +344,11 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 
 func connectRouterToRouterRemote(w http.ResponseWriter, r *http.Request) {
 
-	req := &api.ConnectRouterToRouterRequest{}
+	req := &internal.ConnectRouterToRouterRequest{}
 
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("connectRouterToRouterRemote:", err)
-		daemon.SendError(w, &api.ConnectRouterToRouterResponse{
+		daemon.SendError(w, &internal.ConnectRouterToRouterResponse{
 			R1:        "",
 			R2:        "",
 			MachineID: "",
@@ -362,7 +363,7 @@ func connectRouterToRouterRemote(w http.ResponseWriter, r *http.Request) {
 	linkProps, err := daemon.ParseLinkPropsInternal(req.Latency, req.Bandwidth, req.Jitter, req.DropRate, req.Weight)
 	if err != nil {
 		daemonLog.Println("connectRouterToRouterRemote:", err)
-		daemon.SendError(w, &api.ConnectRouterToRouterResponse{
+		daemon.SendError(w, &internal.ConnectRouterToRouterResponse{
 			R1:        "",
 			R2:        "",
 			MachineID: "",
@@ -379,7 +380,7 @@ func connectRouterToRouterRemote(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 
 			daemonLog.Println("connectRouterToRouterRemote:", err)
-			daemon.SendError(w, api.ConnectRouterToRouterResponse{
+			daemon.SendError(w, internal.ConnectRouterToRouterResponse{
 				R1:        "",
 				R2:        "",
 				MachineID: "",
@@ -393,7 +394,7 @@ func connectRouterToRouterRemote(w http.ResponseWriter, r *http.Request) {
 	} else {
 
 		daemonLog.Println("connectRouterToRouterRemote:", "invalid apply operation")
-		daemon.SendError(w, api.ConnectRouterToRouterResponse{
+		daemon.SendError(w, internal.ConnectRouterToRouterResponse{
 			R1:        "",
 			R2:        "",
 			MachineID: "",
@@ -405,7 +406,7 @@ func connectRouterToRouterRemote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	daemon.SendResponse(w, &api.ConnectRouterToRouterResponse{
+	daemon.SendResponse(w, &internal.ConnectRouterToRouterResponse{
 		R1:        req.R1,
 		R2:        req.R2,
 		MachineID: req.MachineID,
@@ -626,7 +627,7 @@ func inspectNode(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("inspectNode:", err)
 		daemon.SendError(w, &inspectApi.InspectNodeResponse{
-			Name: req.Name,
+			Node: api.Node{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -637,49 +638,45 @@ func inspectNode(w http.ResponseWriter, r *http.Request) {
 
 	if node, ok := engine.app.GetNode(req.Name); ok {
 		if node.MachineId == engine.app.GetMachineId() {
-			if node.Bridge != nil {
-				if node.Bridge.Router != nil {
-					daemon.SendResponse(w, inspectApi.InspectNodeResponse{
-						Name:      node.ID(),
-						Bridge:    node.Bridge.ID(),
-						Router:    node.Bridge.Router.ID(),
-						MachineId: node.MachineId,
-						Error:     apiErrors.Error{},
-					})
-					return
-				} else {
-					daemon.SendResponse(w, inspectApi.InspectNodeResponse{
-						Name:      node.ID(),
-						Bridge:    node.Bridge.ID(),
-						MachineId: node.MachineId,
-						Error:     apiErrors.Error{},
-					})
-					return
-				}
-			}
 			daemon.SendResponse(w, inspectApi.InspectNodeResponse{
-				Name:      node.ID(),
-				MachineId: node.MachineId,
-				Error:     apiErrors.Error{},
-			})
-		} else {
-			daemon.SendError(w, inspectApi.InspectNodeResponse{
-				Name:      req.Name,
-				Bridge:    "",
-				Router:    "",
-				MachineId: "",
-				Error: apiErrors.Error{
-					ErrCode: 1,
-					ErrMsg:  "Something went wrong",
-				},
+				Node:  node,
+				Error: apiErrors.Error{},
 			})
 			return
+		} else {
+			msg, err := engine.cd.Cl.SendMsg(node.MachineId, req, "inspectNode")
+			if err != nil {
+				daemonLog.Println("inspectNode:", err)
+				daemon.SendError(w, &inspectApi.InspectNodeResponse{
+					Node: api.Node{},
+					Error: apiErrors.Error{
+						ErrCode: 1,
+						ErrMsg:  err.Error(),
+					},
+				})
+				return
+			}
+			d := json.NewDecoder(msg.Body)
+			resp := &inspectApi.InspectNodeResponse{}
+			err = d.Decode(&resp)
+			if err != nil {
+				daemonLog.Println("inspectNode:", err)
+				daemon.SendError(w, &inspectApi.InspectNodeResponse{
+					Node: api.Node{},
+					Error: apiErrors.Error{
+						ErrCode: 1,
+						ErrMsg:  err.Error(),
+					},
+				})
+				return
+			}
+			daemon.SendResponse(w, resp)
 		}
 
 	} else {
 		daemonLog.Println("inspectNode: Invalid node id")
 		daemon.SendError(w, &inspectApi.InspectNodeResponse{
-			Name: req.Name,
+			Node: api.Node{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  "Node doesn't exist.",
@@ -696,7 +693,7 @@ func inspectBridge(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("inspectBridge:", err)
 		daemon.SendError(w, &inspectApi.InspectBridgeResponse{
-			Name: req.Name,
+			Bridge: api.Bridge{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -707,50 +704,45 @@ func inspectBridge(w http.ResponseWriter, r *http.Request) {
 
 	if bridge, ok := engine.app.GetBridge(req.Name); ok {
 		if bridge.MachineId == engine.app.GetMachineId() {
-
-			connectedNodes := make([]inspectApi.BridgeNode, 0, len(bridge.ConnectedNodes))
-
-			for _, node := range bridge.ConnectedNodes {
-				connectedNodes = append(connectedNodes, inspectApi.BridgeNode{
-					Id:  node.ID(),
-					Mac: net.HardwareAddr(node.NetworkNode.GetMac()).String(),
-				})
-			}
-			if bridge.Router != nil {
-				daemon.SendResponse(w, inspectApi.InspectBridgeResponse{
-					Name:      bridge.ID(),
-					RouterId:  bridge.Router.ID(),
-					Nodes:     connectedNodes,
-					MachineId: bridge.MachineId,
-					Error:     apiErrors.Error{},
-				})
-				return
-			} else {
-				daemon.SendResponse(w, inspectApi.InspectBridgeResponse{
-					Name:      bridge.ID(),
-					Nodes:     connectedNodes,
-					MachineId: bridge.MachineId,
-					Error:     apiErrors.Error{},
-				})
-				return
-			}
-		} else {
-			daemon.SendError(w, inspectApi.InspectBridgeResponse{
-				Name:      req.Name,
-				RouterId:  "",
-				Nodes:     nil,
-				MachineId: "",
-				Error: apiErrors.Error{
-					ErrCode: 1,
-					ErrMsg:  "Something went wrong",
-				},
+			daemon.SendResponse(w, inspectApi.InspectBridgeResponse{
+				Bridge: bridge,
+				Error:  apiErrors.Error{},
 			})
 			return
+		} else {
+			msg, err := engine.cd.Cl.SendMsg(bridge.MachineId, req, "inspectBridge")
+
+			if err != nil {
+				daemonLog.Println("inspectBridge:", err)
+				daemon.SendError(w, &inspectApi.InspectBridgeResponse{
+					Bridge: api.Bridge{},
+					Error: apiErrors.Error{
+						ErrCode: 1,
+						ErrMsg:  err.Error(),
+					},
+				})
+				return
+			}
+			d := json.NewDecoder(msg.Body)
+			resp := &inspectApi.InspectBridgeResponse{}
+			err = d.Decode(&resp)
+			if err != nil {
+				daemonLog.Println("inspectBridge:", err)
+				daemon.SendError(w, &inspectApi.InspectBridgeResponse{
+					Bridge: bridge,
+					Error: apiErrors.Error{
+						ErrCode: 1,
+						ErrMsg:  err.Error(),
+					},
+				})
+				return
+			}
+			daemon.SendResponse(w, resp)
 		}
 	} else {
 		fmt.Println("Invalid bridge id.")
 		daemon.SendError(w, &inspectApi.InspectBridgeResponse{
-			Name: req.Name,
+			Bridge: api.Bridge{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  "Invalid bridge id.",
@@ -767,7 +759,7 @@ func inspectRouter(w http.ResponseWriter, r *http.Request) {
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("inspectRouter:", err)
 		daemon.SendError(w, &inspectApi.InspectRouterResponse{
-			Name: req.Name,
+			Router: api.Router{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -779,56 +771,45 @@ func inspectRouter(w http.ResponseWriter, r *http.Request) {
 	if router, ok := engine.app.GetRouter(req.Name); ok {
 		if router.MachineId == engine.app.GetMachineId() {
 
-			connectedBridges := make([]string, 0, len(router.ConnectedBridges))
-			connectedNodes := make(map[string][]string)
-
-			for id, bridge := range router.ConnectedBridges {
-				connectedBridges = append(connectedBridges, id)
-				connectedNodes[id] = make([]string, 0, len(bridge.ConnectedNodes))
-
-				for _, node := range bridge.ConnectedNodes {
-					connectedNodes[id] = append(connectedNodes[id], node.ID())
-				}
-			}
-
-			connectedRouters := make([]string, 0, len(router.ConnectedRouters))
-
-			for connectedRouter := range router.ConnectedRouters {
-				connectedRouters = append(connectedRouters, connectedRouter)
-			}
-
-			weights := make(map[string]string, len(router.Weights))
-			for id, weight := range router.Weights {
-				weights[net.HardwareAddr(id).String()] = weight.Router
-			}
-
 			daemon.SendResponse(w, inspectApi.InspectRouterResponse{
-				Name:      router.ID(),
-				MachineId: router.MachineId,
-				Bridges:   connectedBridges,
-				Nodes:     connectedNodes,
-				Routers:   connectedRouters,
-				Weights:   weights,
-				Error:     apiErrors.Error{},
-			})
-		} else {
-			daemon.SendError(w, inspectApi.InspectRouterResponse{
-				Name:    req.Name,
-				Bridges: nil,
-				Nodes:   nil,
-				Routers: nil,
-				Weights: nil,
-				Error: apiErrors.Error{
-					ErrCode: 1,
-					ErrMsg:  "Something went wrong",
-				},
+				Router: router,
+				Error:  apiErrors.Error{},
 			})
 			return
+		} else {
+			msg, err := engine.cd.Cl.SendMsg(router.MachineId, req, "inspectRouter")
+
+			if err != nil {
+				daemonLog.Println("inspectRouter:", err)
+				daemon.SendError(w, &inspectApi.InspectRouterResponse{
+					Router: api.Router{},
+					Error: apiErrors.Error{
+						ErrCode: 1,
+						ErrMsg:  err.Error(),
+					},
+				})
+				return
+			}
+			d := json.NewDecoder(msg.Body)
+			resp := &inspectApi.InspectRouterResponse{}
+			err = d.Decode(&resp)
+			if err != nil {
+				daemonLog.Println("inspectRouter:", err)
+				daemon.SendError(w, &inspectApi.InspectRouterResponse{
+					Router: api.Router{},
+					Error: apiErrors.Error{
+						ErrCode: 1,
+						ErrMsg:  err.Error(),
+					},
+				})
+				return
+			}
+			daemon.SendResponse(w, resp)
 		}
 	} else {
 		daemonLog.Println("inspectRouter: Invalid router id")
 		daemon.SendError(w, &inspectApi.InspectRouterResponse{
-			Name: req.Name,
+			Router: api.Router{},
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  "Invalid router id.",
