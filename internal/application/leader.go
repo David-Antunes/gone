@@ -878,20 +878,14 @@ func (app *Leader) RemoveRouter(routerId string) error {
 		}
 	}
 
-	links := make([]*topology.BiLink, len(r.RouterLinks))
-
 	for _, link := range r.RouterLinks {
-		links = append(links, link)
+		app.gcLinkShaper(link.NetworkBILink)
 	}
 
 	_, err := app.topo.RemoveRouter(routerId)
 
 	if err != nil {
 		return err
-	}
-
-	for _, link := range links {
-		app.gcLinkShaper(link.NetworkBILink)
 	}
 
 	if r.MachineId != app.GetMachineId() {

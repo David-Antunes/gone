@@ -737,20 +737,14 @@ func (app *Follower) RemoveRouter(routerId string) error {
 		graphDB.RemoveRouter(routerId)
 	}
 
-	links := make([]*topology.BiLink, len(r.RouterLinks))
-
 	for _, link := range r.RouterLinks {
-		links = append(links, link)
+		app.gcLinkShaper(link.NetworkBILink)
 	}
 
 	_, err := app.topo.RemoveRouter(routerId)
 
 	if err != nil {
 		return err
-	}
-
-	for _, link := range links {
-		app.gcLinkShaper(link.NetworkBILink)
 	}
 
 	return nil
