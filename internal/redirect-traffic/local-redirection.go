@@ -95,14 +95,8 @@ func (rs *RedirectionSocket) Start() {
 }
 
 func (rs *RedirectionSocket) Stop() {
-	err := rs.sock.Close()
-	if err != nil {
-		return
-	}
-	err = os.Remove(rs.socketPath)
-	if err != nil {
-		return
-	}
+	rs.sock.Close()
+	os.Remove(rs.socketPath)
 }
 
 func (rs *RedirectionSocket) redirect(conn net.Conn) {
