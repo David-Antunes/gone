@@ -105,7 +105,7 @@ func (app *Follower) clearSniffLink(id string) error {
 
 // Changes Intercept into network shaper
 func (app *Follower) clearInterceptLink(id string) error {
-	if sniffer, err := app.redirectManager.GetIntercept(id); err != nil {
+	if intercept, err := app.redirectManager.GetIntercept(id); err != nil {
 		return err
 	} else {
 		err = app.redirectManager.RemoveIntercept(id)
@@ -114,7 +114,7 @@ func (app *Follower) clearInterceptLink(id string) error {
 		} else {
 
 			// Convert to network link
-			link := sniffer.Component.(*topology.Link).NetworkLink
+			link := intercept.Component.(*topology.Link).NetworkLink
 
 			link.GetShaper().Stop()
 			l := link.GetShaper().(*network.InterceptShaper).ConvertToNetworkShaper()
@@ -943,7 +943,7 @@ func (app *Follower) ListSniffers() []api.SniffComponent {
 }
 
 func (app *Follower) StopSniff(id string) error {
-	if s, err := app.redirectManager.GetSniffer(id); err == nil {
+	if s, err := app.redirectManager.GetSniffer(id); err != nil {
 		return err
 	} else {
 		if app.GetMachineId() == s.MachineId {
@@ -1026,6 +1026,9 @@ func (app *Follower) SniffNode(nodeId string, id string) (string, string, string
 		newSniff = n.Link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		n.Link.NetworkBILink.Right.SetShaper(newSniff)
 		n.Link.NetworkBILink.Right.Start()
+
+		n.Link.ConnectsFrom.NetworkLink = n.Link.NetworkBILink.Left
+		n.Link.ConnectsTo.NetworkLink = n.Link.NetworkBILink.Right
 
 		go redirect.Start()
 
@@ -1115,6 +1118,9 @@ func (app *Follower) SniffBridge(bridgeId string, id string) (string, string, st
 		newSniff = b.RouterLink.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		b.RouterLink.NetworkBILink.Right.SetShaper(newSniff)
 		b.RouterLink.NetworkBILink.Right.Start()
+
+		b.RouterLink.ConnectsFrom.NetworkLink = b.RouterLink.NetworkBILink.Left
+		b.RouterLink.ConnectsTo.NetworkLink = b.RouterLink.NetworkBILink.Right
 
 		go redirect.Start()
 
@@ -1210,6 +1216,9 @@ func (app *Follower) SniffRouters(router1 string, router2 string, id string) (st
 			link.NetworkBILink.Right.SetShaper(newSniff)
 			link.NetworkBILink.Right.Start()
 
+			link.ConnectsFrom.NetworkLink = link.NetworkBILink.Left
+			link.ConnectsTo.NetworkLink = link.NetworkBILink.Right
+
 			go redirect.Start()
 
 			return id, redirect.GetSocketPath(), r1.MachineId, nil
@@ -1299,6 +1308,7 @@ func (app *Follower) InterceptNode(nodeId string, id string, direction bool) (st
 			intercept := n.Link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			n.Link.NetworkBILink.Left.SetShaper(intercept)
 			n.Link.NetworkBILink.Left.Start()
+			n.Link.ConnectsFrom.NetworkLink = n.Link.NetworkBILink.Left
 		} else {
 
 			if isSpecialLink(n.Link.ConnectsTo) {
@@ -1320,6 +1330,7 @@ func (app *Follower) InterceptNode(nodeId string, id string, direction bool) (st
 			intercept := n.Link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			n.Link.NetworkBILink.Right.SetShaper(intercept)
 			n.Link.NetworkBILink.Right.Start()
+			n.Link.ConnectsTo.NetworkLink = n.Link.NetworkBILink.Right
 
 		}
 
@@ -1407,6 +1418,7 @@ func (app *Follower) InterceptBridge(bridgeId string, id string, direction bool)
 			intercept := b.RouterLink.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			b.RouterLink.NetworkBILink.Left.SetShaper(intercept)
 			b.RouterLink.NetworkBILink.Left.Start()
+			b.RouterLink.ConnectsFrom.NetworkLink = b.RouterLink.NetworkBILink.Left
 
 		} else {
 
@@ -1430,6 +1442,7 @@ func (app *Follower) InterceptBridge(bridgeId string, id string, direction bool)
 			intercept := b.RouterLink.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			b.RouterLink.NetworkBILink.Right.SetShaper(intercept)
 			b.RouterLink.NetworkBILink.Right.Start()
+			b.RouterLink.ConnectsTo.NetworkLink = b.RouterLink.NetworkBILink.Right
 		}
 
 		app.redirectManager.AddIntercept(id, interceptComponent)
@@ -1528,6 +1541,7 @@ func (app *Follower) InterceptRouters(router1 string, router2 string, id string,
 					intercept := link.ConnectsFrom.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsFrom.NetworkLink.SetShaper(intercept)
 					link.ConnectsFrom.NetworkLink.Start()
+					link.ConnectsFrom.NetworkLink = link.NetworkBILink.Left
 
 				} else {
 					if isSpecialLink(link.ConnectsTo) {
@@ -1552,6 +1566,7 @@ func (app *Follower) InterceptRouters(router1 string, router2 string, id string,
 					intercept := link.ConnectsTo.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsTo.NetworkLink.SetShaper(intercept)
 					link.ConnectsTo.NetworkLink.Start()
+					link.ConnectsTo.NetworkLink = link.NetworkBILink.Right
 				}
 			} else {
 				if direction {
@@ -1577,6 +1592,7 @@ func (app *Follower) InterceptRouters(router1 string, router2 string, id string,
 					intercept := link.ConnectsTo.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsTo.NetworkLink.SetShaper(intercept)
 					link.ConnectsTo.NetworkLink.Start()
+					link.ConnectsTo.NetworkLink = link.NetworkBILink.Right
 				} else {
 					if isSpecialLink(link.ConnectsFrom) {
 						return "", "", "", errors.New("already performing an operation on this link")
@@ -1601,6 +1617,7 @@ func (app *Follower) InterceptRouters(router1 string, router2 string, id string,
 					intercept := link.ConnectsFrom.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsFrom.NetworkLink.SetShaper(intercept)
 					link.ConnectsFrom.NetworkLink.Start()
+					link.ConnectsFrom.NetworkLink = link.NetworkBILink.Left
 				}
 			}
 
@@ -1652,7 +1669,7 @@ func (app *Follower) InterceptRouters(router1 string, router2 string, id string,
 }
 
 func (app *Follower) StopIntercept(id string) error {
-	if s, err := app.redirectManager.GetIntercept(id); err == nil {
+	if s, err := app.redirectManager.GetIntercept(id); err != nil {
 		return err
 	} else {
 		if app.GetMachineId() == s.MachineId {
@@ -1694,7 +1711,7 @@ func (app *Follower) ListIntercepts() []api.InterceptComponent {
 	list := make([]api.InterceptComponent, 0, len(intercepts))
 
 	for id, s := range intercepts {
-		link := s.Component.(*topology.BiLink)
+		link := s.Component.(*topology.Link)
 		list = append(list, api.InterceptComponent{
 			Id:        id,
 			MachineId: s.MachineId,
