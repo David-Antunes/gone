@@ -263,13 +263,13 @@ func (d *DockerManager) RemoveNode(id string) error {
 		_, err := shell.Output()
 		if err != nil {
 			dockerLog.Println("could not kill container", err)
-			return err
+			//return err
 		}
 		shell = exec.Command("docker", "rm", id)
 		_, err = shell.Output()
 		if err != nil {
 			dockerLog.Println("could not remove container", err)
-			return err
+			//return err
 		}
 	}
 	err := d.RemoveArp(container.ip)
