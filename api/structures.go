@@ -2,6 +2,7 @@ package api
 
 type Node struct {
 	Id        string
+	Mac       string
 	MachineId string
 	Bridge    string
 	Link      Link

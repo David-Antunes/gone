@@ -1,10 +1,10 @@
 package application
 
 import (
-	"fmt"
 	"github.com/David-Antunes/gone/api"
 	"github.com/David-Antunes/gone/internal/network"
 	"github.com/David-Antunes/gone/internal/topology"
+	"net"
 )
 
 const _REMOTE_QUEUESIZE = 1000
@@ -53,15 +53,13 @@ func convertToAPINode(n *topology.Node) api.Node {
 			},
 		}
 	}
-
-	a := api.Node{
+	return api.Node{
 		Id:        n.Id,
+		Mac:       net.HardwareAddr(n.NetworkNode.GetMac()).String(),
 		MachineId: n.MachineId,
 		Bridge:    b,
 		Link:      *link,
 	}
-	fmt.Println(a)
-	return a
 }
 
 func convertToAPIBridge(b *topology.Bridge) api.Bridge {
@@ -126,7 +124,7 @@ func convertToAPIRouter(r *topology.Router) api.Router {
 	}
 
 	for k, v := range r.Weights {
-		weights[v.Router][k] = v.Weight
+		weights[v.Router][net.HardwareAddr(k).String()] = v.Weight
 	}
 
 	return api.Router{
