@@ -1195,15 +1195,15 @@ func (app *Leader) Forget(routerId string) error {
 func (app *Leader) ListSniffers() []api.SniffComponent {
 	sniffers := app.redirectManager.ListSniffers()
 
-	list := make([]api.SniffComponent, len(sniffers))
+	list := make([]api.SniffComponent, 0, len(sniffers))
 
 	for id, s := range sniffers {
 		link := s.Component.(*topology.BiLink)
 		list = append(list, api.SniffComponent{
 			Id:        id,
 			MachineId: s.MachineId,
-			To:        link.ConnectsTo.ID(),
-			From:      link.ConnectsFrom.ID(),
+			To:        link.To.ID(),
+			From:      link.From.ID(),
 			Path:      s.Socket.GetSocketPath(),
 		})
 	}
@@ -1976,15 +1976,15 @@ func (app *Leader) StopIntercept(id string) error {
 func (app *Leader) ListIntercepts() []api.InterceptComponent {
 	intercepts := app.redirectManager.ListIntercepts()
 
-	list := make([]api.InterceptComponent, len(intercepts))
+	list := make([]api.InterceptComponent, 0, len(intercepts))
 
 	for id, s := range intercepts {
 		link := s.Component.(*topology.BiLink)
 		list = append(list, api.InterceptComponent{
 			Id:        id,
 			MachineId: s.MachineId,
-			To:        link.ConnectsTo.ID(),
-			From:      link.ConnectsFrom.ID(),
+			To:        link.To.ID(),
+			From:      link.From.ID(),
 			Path:      s.Socket.GetSocketPath(),
 		})
 	}

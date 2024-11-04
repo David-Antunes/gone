@@ -113,7 +113,6 @@ func (rm *RedirectManager) ListSniffers() map[string]SniffComponent {
 	for k, v := range rm.sniffers {
 		list[k] = *v
 	}
-
 	rm.mu.Unlock()
 	return list
 }

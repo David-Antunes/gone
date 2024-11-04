@@ -69,10 +69,10 @@ func setEnvVariables() {
 	viper.SetDefault("NETWORK_NAMESPACE", "gone_net")
 	viper.SetDefault("NUM_TESTS", 1000)
 	viper.SetConfigType("env")
-	//err := viper.WriteConfig()
-	//if err != nil {
-	//	emulationLog.Println(err)
-	//}
+	err := viper.WriteConfig()
+	if err != nil {
+		emulationLog.Println(err)
+	}
 }
 
 func printVariables() {
