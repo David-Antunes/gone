@@ -1842,7 +1842,6 @@ func (app *Leader) InterceptRouters(router1 string, router2 string, id string, d
 					intercept := link.ConnectsFrom.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsFrom.NetworkLink.SetShaper(intercept)
 					link.ConnectsFrom.NetworkLink.Start()
-					link.ConnectsFrom.NetworkLink = link.NetworkBILink.Left
 
 				} else {
 					if isSpecialLink(link.ConnectsTo) {
@@ -1867,7 +1866,6 @@ func (app *Leader) InterceptRouters(router1 string, router2 string, id string, d
 					intercept := link.ConnectsTo.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsTo.NetworkLink.SetShaper(intercept)
 					link.ConnectsTo.NetworkLink.Start()
-					link.ConnectsTo.NetworkLink = link.NetworkBILink.Right
 				}
 			} else {
 				if direction {
@@ -1893,7 +1891,7 @@ func (app *Leader) InterceptRouters(router1 string, router2 string, id string, d
 					intercept := link.ConnectsTo.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsTo.NetworkLink.SetShaper(intercept)
 					link.ConnectsTo.NetworkLink.Start()
-					link.ConnectsTo.NetworkLink = link.NetworkBILink.Right
+
 				} else {
 					if isSpecialLink(link.ConnectsFrom) {
 						return "", "", "", errors.New("already performing an operation on this link")
@@ -1918,9 +1916,10 @@ func (app *Leader) InterceptRouters(router1 string, router2 string, id string, d
 					intercept := link.ConnectsFrom.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsFrom.NetworkLink.SetShaper(intercept)
 					link.ConnectsFrom.NetworkLink.Start()
-					link.ConnectsFrom.NetworkLink = link.NetworkBILink.Left
 				}
 			}
+
+			app.redirectManager.AddIntercept(id, interceptComponent)
 
 			go interceptComponent.Socket.Start()
 
