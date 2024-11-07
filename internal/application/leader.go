@@ -2082,3 +2082,214 @@ func (app *Leader) Unpause(id string, all bool) error {
 		}
 	}
 }
+
+func (app *Leader) DisruptNode(id string) error {
+	if n, ok := app.topo.GetNode(id); ok {
+		if n.MachineId == app.GetMachineId() {
+			if n.Link.NetworkBILink.Disrupt() {
+				return nil
+			} else {
+				return errors.New("could not disrupt link")
+			}
+		} else {
+
+			resp, err := app.cl.SendMsg(n.MachineId, &opApi.DisruptNodeRequest{Node: id}, "disruptNode")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &opApi.DisruptNodeResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
+			return nil
+		}
+	} else {
+		return errors.New("invalid node id")
+	}
+}
+
+func (app *Leader) DisruptBridge(id string) error {
+	if b, ok := app.topo.GetBridge(id); ok {
+		if b.MachineId == app.GetMachineId() {
+			if b.RouterLink.NetworkBILink.Disrupt() {
+				return nil
+			} else {
+				return errors.New("could not disrupt link")
+			}
+		} else {
+
+			resp, err := app.cl.SendMsg(b.MachineId, &opApi.DisruptBridgeRequest{Bridge: id}, "disruptBridge")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &opApi.DisruptBridgeResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
+			return nil
+		}
+	} else {
+		return errors.New("invalid bridge id")
+	}
+}
+
+func (app *Leader) DisruptRouters(router1Id string, router2Id string) error {
+
+	if r1, ok := app.topo.GetRouter(router1Id); !ok {
+		return errors.New("invalid router id: " + router1Id)
+	} else if r2, ok := app.topo.GetRouter(router2Id); !ok {
+		return errors.New("invalid router id: " + router2Id)
+	} else if !(r1.MachineId == r2.MachineId) {
+		return errors.New("could not disrupt connnection between remote routers")
+	} else if r1.MachineId == app.GetMachineId() {
+		if r1.RouterLinks[r2.ID()].NetworkBILink.Disrupt() {
+			return nil
+		} else {
+			return errors.New("could not disrupt link")
+		}
+	} else {
+		resp, err := app.cl.SendMsg(r1.MachineId, &opApi.DisruptRoutersRequest{
+			Router1: r1.ID(),
+			Router2: r2.ID(),
+		}, "disruptRouters")
+
+		if err != nil {
+			return err
+		}
+
+		d := json.NewDecoder(resp.Body)
+		req := &opApi.DisruptRoutersResponse{}
+		err = d.Decode(&req)
+
+		if err != nil {
+			return err
+		}
+
+		if req.Error.ErrCode != 0 {
+			return errors.New(req.Error.ErrMsg)
+		}
+		return nil
+	}
+
+}
+func (app *Leader) StopDisruptNode(id string) error {
+	if n, ok := app.topo.GetNode(id); ok {
+		if n.MachineId == app.GetMachineId() {
+			if n.Link.NetworkBILink.StopDisrupt() {
+				return nil
+			} else {
+				return errors.New("could not stop link")
+			}
+		} else {
+
+			resp, err := app.cl.SendMsg(n.MachineId, &opApi.DisruptNodeRequest{Node: id}, "stopDisruptNode")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &opApi.DisruptNodeResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
+			return nil
+		}
+	} else {
+		return errors.New("invalid node id")
+	}
+}
+
+func (app *Leader) StopDisruptBridge(id string) error {
+	if b, ok := app.topo.GetBridge(id); ok {
+		if b.MachineId == app.GetMachineId() {
+			if b.RouterLink.NetworkBILink.StopDisrupt() {
+				return nil
+			} else {
+				return errors.New("could not stop link")
+			}
+		} else {
+
+			resp, err := app.cl.SendMsg(b.MachineId, &opApi.DisruptBridgeRequest{Bridge: id}, "stopDisruptBridge")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &opApi.DisruptBridgeResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
+			return nil
+		}
+	} else {
+		return errors.New("invalid bridge id")
+	}
+}
+
+func (app *Leader) StopDisruptRouters(router1Id string, router2Id string) error {
+
+	if r1, ok := app.topo.GetRouter(router1Id); !ok {
+		return errors.New("invalid router id: " + router1Id)
+	} else if r2, ok := app.topo.GetRouter(router2Id); !ok {
+		return errors.New("invalid router id: " + router2Id)
+	} else if !(r1.MachineId == r2.MachineId) {
+		return errors.New("could not stop disrupt connnection between remote routers")
+	} else if r1.MachineId == app.GetMachineId() {
+		if r1.RouterLinks[r2.ID()].NetworkBILink.StopDisrupt() {
+			return nil
+		} else {
+			return errors.New("could not stop link")
+		}
+	} else {
+		resp, err := app.cl.SendMsg(r1.MachineId, &opApi.DisruptRoutersRequest{
+			Router1: r1.ID(),
+			Router2: r2.ID(),
+		}, "stopDisruptRouters")
+
+		if err != nil {
+			return err
+		}
+
+		d := json.NewDecoder(resp.Body)
+		req := &opApi.DisruptRoutersResponse{}
+		err = d.Decode(&req)
+
+		if err != nil {
+			return err
+		}
+
+		if req.Error.ErrCode != 0 {
+			return errors.New(req.Error.ErrMsg)
+		}
+		return nil
+	}
+
+}

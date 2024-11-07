@@ -34,3 +34,12 @@ func (link *BiLink) Stop() {
 	link.Left.Stop()
 	link.Right.Stop()
 }
+func (link *BiLink) Disrupt() bool {
+	link.Left.Disrupt()
+	return link.Right.Disrupt()
+}
+
+func (link *BiLink) StopDisrupt() bool {
+	link.Left.StopDisrupt()
+	return link.Right.StopDisrupt()
+}

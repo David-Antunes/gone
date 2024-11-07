@@ -70,3 +70,11 @@ func (link *Link) SetShaper(shaper Shaper) *Link {
 	link.shaper = shaper
 	return link
 }
+
+func (link *Link) Disrupt() bool {
+	return link.shaper.Disrupt()
+}
+
+func (link *Link) StopDisrupt() bool {
+	return link.shaper.StopDisrupt()
+}
