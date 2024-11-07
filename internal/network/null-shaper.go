@@ -32,7 +32,7 @@ func CreateNullShaper(incoming chan *xdp.Frame) Shaper {
 		running:  false,
 		incoming: incoming,
 		delay:    &Delay{0},
-		ctx:      make(chan struct{}),
+		ctx:      make(chan struct{}, 1),
 	}
 }
 
@@ -60,4 +60,12 @@ func (shaper *NullShaper) receive() {
 		case <-shaper.incoming:
 		}
 	}
+}
+
+func (shaper *NullShaper) Disrupt() bool {
+	return false
+}
+
+func (shaper *NullShaper) StopDisrupt() bool {
+	return true
 }

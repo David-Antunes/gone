@@ -19,6 +19,7 @@ type NetworkShaper struct {
 	limiter   *rate.Limiter
 	tokenSize int
 	ctx       chan struct{}
+	disrupted disruptLogic
 }
 
 func (shaper *NetworkShaper) GetProps() LinkProps {
@@ -53,7 +54,11 @@ func CreateNetworkShaper(incoming chan *xdp.Frame, outgoing chan *xdp.Frame, pro
 		props:     props,
 		limiter:   rate.NewLimiter(rate.Every(time.Duration(newTime)), 1),
 		tokenSize: packetSize,
-		ctx:       make(chan struct{}),
+		ctx:       make(chan struct{}, 2),
+		disrupted: disruptLogic{
+			disrupted: false,
+			ctx:       make(chan struct{}, 1),
+		},
 	}
 }
 func (shaper *NetworkShaper) Stop() {
@@ -74,6 +79,45 @@ func (shaper *NetworkShaper) Start() {
 			go shaper.receiveLatency()
 		}
 	}
+}
+
+func (shaper *NetworkShaper) Disrupt() bool {
+	if !shaper.disrupted.disrupted {
+		shaper.disrupted.disrupted = true
+		shaper.Stop()
+		go shaper.null()
+
+		// Clear queue for requests
+		go func() {
+			go shaper.send()
+			time.Sleep(time.Second)
+			shaper.ctx <- struct{}{}
+		}()
+		return true
+	} else {
+		return false
+	}
+}
+
+func (shaper *NetworkShaper) null() {
+	for {
+		select {
+		case <-shaper.disrupted.ctx:
+			return
+		case <-shaper.incoming:
+			continue
+		}
+	}
+}
+
+func (shaper *NetworkShaper) StopDisrupt() bool {
+
+	if shaper.disrupted.disrupted {
+		shaper.disrupted.ctx <- struct{}{}
+		shaper.Start()
+		return true
+	}
+	return false
 }
 
 func (shaper *NetworkShaper) receiveLatency() {
@@ -153,6 +197,9 @@ func (shaper *NetworkShaper) send() {
 }
 
 func (shaper *NetworkShaper) ConvertToSniffShaper(rt *redirect_traffic.SniffComponent) *SniffShaper {
+	if shaper.StopDisrupt() {
+		shaper.Stop()
+	}
 	return &SniffShaper{
 		running:   false,
 		queue:     shaper.queue,
@@ -164,10 +211,14 @@ func (shaper *NetworkShaper) ConvertToSniffShaper(rt *redirect_traffic.SniffComp
 		tokenSize: shaper.tokenSize,
 		rt:        rt,
 		ctx:       shaper.ctx,
+		disrupted: shaper.disrupted,
 	}
 }
 
 func (shaper *NetworkShaper) ConvertToInterceptShaper(rt *redirect_traffic.InterceptComponent) *InterceptShaper {
+	if shaper.StopDisrupt() {
+		shaper.Stop()
+	}
 	return &InterceptShaper{
 		running:   false,
 		queue:     shaper.queue,
@@ -179,5 +230,6 @@ func (shaper *NetworkShaper) ConvertToInterceptShaper(rt *redirect_traffic.Inter
 		tokenSize: shaper.tokenSize,
 		rt:        rt,
 		ctx:       shaper.ctx,
+		disrupted: shaper.disrupted,
 	}
 }

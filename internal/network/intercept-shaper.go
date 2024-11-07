@@ -19,6 +19,7 @@ type InterceptShaper struct {
 	tokenSize int
 	ctx       chan struct{}
 	rt        *redirect_traffic.InterceptComponent
+	disrupted disruptLogic
 }
 
 func (shaper *InterceptShaper) GetProps() LinkProps {
@@ -57,8 +58,12 @@ func NewInterceptShaper(incoming chan *xdp.Frame, outgoing chan *xdp.Frame, prop
 		delay:     &Delay{0},
 		limiter:   rate.NewLimiter(rate.Every(time.Duration(newTime)), 1),
 		tokenSize: packetSize,
-		ctx:       make(chan struct{}),
+		ctx:       make(chan struct{}, 2),
 		rt:        rt,
+		disrupted: disruptLogic{
+			disrupted: false,
+			ctx:       make(chan struct{}, 1),
+		},
 	}
 }
 
@@ -76,6 +81,45 @@ func (shaper *InterceptShaper) Start() {
 		go shaper.receive()
 		go shaper.send()
 	}
+}
+
+func (shaper *InterceptShaper) Disrupt() bool {
+	if !shaper.disrupted.disrupted {
+		shaper.disrupted.disrupted = true
+		shaper.Stop()
+		go shaper.null()
+
+		// Clear queue for requests
+		go func() {
+			go shaper.send()
+			time.Sleep(time.Second)
+			shaper.ctx <- struct{}{}
+		}()
+		return true
+	} else {
+		return false
+	}
+}
+
+func (shaper *InterceptShaper) null() {
+	for {
+		select {
+		case <-shaper.disrupted.ctx:
+			return
+		case <-shaper.incoming:
+			continue
+		}
+	}
+}
+
+func (shaper *InterceptShaper) StopDisrupt() bool {
+
+	if shaper.disrupted.disrupted {
+		shaper.disrupted.ctx <- struct{}{}
+		shaper.Start()
+		return true
+	}
+	return false
 }
 
 func (shaper *InterceptShaper) receive() {
@@ -139,6 +183,9 @@ func (shaper *InterceptShaper) send() {
 }
 
 func (shaper *InterceptShaper) ConvertToNetworkShaper() *NetworkShaper {
+	if shaper.StopDisrupt() {
+		shaper.Stop()
+	}
 	return &NetworkShaper{
 		running:   false,
 		queue:     shaper.queue,

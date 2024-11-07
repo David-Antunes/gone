@@ -94,7 +94,7 @@ func (router *Router) Stop() {
 	}
 }
 
-func (router *Router) disrupt() {
+func (router *Router) Disrupt() {
 	if !router.disrupted.disrupted {
 		router.disrupted.disrupted = true
 		router.Stop()
@@ -113,7 +113,7 @@ func (router *Router) null() {
 	}
 }
 
-func (router *Router) stopDisrupt() {
+func (router *Router) StopDisrupt() {
 	if router.disrupted.disrupted {
 		router.disrupted.ctx <- struct{}{}
 		router.Start()

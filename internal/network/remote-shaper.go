@@ -131,3 +131,11 @@ func (shaper *RemoteShaper) send() {
 		}
 	}
 }
+
+func (shaper *RemoteShaper) Disrupt() bool {
+	return false
+}
+
+func (shaper *RemoteShaper) StopDisrupt() bool {
+	return true
+}

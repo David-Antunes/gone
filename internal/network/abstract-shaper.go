@@ -6,6 +6,8 @@ type Shaper interface {
 	Start()
 	SetDelay(delay *Delay)
 	GetDelay() *Delay
+	Disrupt() bool
+	StopDisrupt() bool
 	Stop()
 }
 

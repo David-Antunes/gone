@@ -19,6 +19,7 @@ type SniffShaper struct {
 	tokenSize int
 	ctx       chan struct{}
 	rt        *redirect_traffic.SniffComponent
+	disrupted disruptLogic
 }
 
 func (shaper *SniffShaper) GetProps() LinkProps {
@@ -56,8 +57,12 @@ func NewSniffShaper(incoming chan *xdp.Frame, outgoing chan *xdp.Frame, props Li
 		delay:     &Delay{0},
 		limiter:   rate.NewLimiter(rate.Every(time.Duration(newTime)), 1),
 		tokenSize: packetSize,
-		ctx:       make(chan struct{}),
+		ctx:       make(chan struct{}, 2),
 		rt:        rt,
+		disrupted: disruptLogic{
+			disrupted: false,
+			ctx:       make(chan struct{}, 1),
+		},
 	}
 }
 
@@ -75,6 +80,45 @@ func (shaper *SniffShaper) Start() {
 		go shaper.receive()
 		go shaper.send()
 	}
+}
+
+func (shaper *SniffShaper) Disrupt() bool {
+	if !shaper.disrupted.disrupted {
+		shaper.disrupted.disrupted = true
+		shaper.Stop()
+		go shaper.null()
+
+		// Clear queue for requests
+		go func() {
+			go shaper.send()
+			time.Sleep(time.Second)
+			shaper.ctx <- struct{}{}
+		}()
+		return true
+	} else {
+		return false
+	}
+}
+
+func (shaper *SniffShaper) null() {
+	for {
+		select {
+		case <-shaper.disrupted.ctx:
+			return
+		case <-shaper.incoming:
+			continue
+		}
+	}
+}
+
+func (shaper *SniffShaper) StopDisrupt() bool {
+
+	if shaper.disrupted.disrupted {
+		shaper.disrupted.ctx <- struct{}{}
+		shaper.Start()
+		return true
+	}
+	return false
 }
 
 func (shaper *SniffShaper) receive() {
@@ -136,6 +180,9 @@ func (shaper *SniffShaper) send() {
 }
 
 func (shaper *SniffShaper) ConvertToNetworkShaper() *NetworkShaper {
+	if shaper.StopDisrupt() {
+		shaper.Stop()
+	}
 	return &NetworkShaper{
 		running:   false,
 		queue:     shaper.queue,
