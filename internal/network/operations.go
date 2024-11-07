@@ -4,6 +4,11 @@ import (
 	"github.com/David-Antunes/gone-proxy/xdp"
 )
 
+type disruptLogic struct {
+	disrupted bool
+	ctx       chan struct{}
+}
+
 func ConnectNodeToBridge(node *Node, bridge *Bridge, props LinkProps) *BiLink {
 
 	bridgeOutgoingChannel := make(chan *xdp.Frame, queueSize)

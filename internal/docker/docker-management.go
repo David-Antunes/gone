@@ -310,6 +310,7 @@ func (d *DockerManager) Pause(id string) error {
 	}
 	return nil
 }
+
 func (d *DockerManager) PauseAll() {
 
 	for _, node := range d.nodes {
@@ -318,6 +319,7 @@ func (d *DockerManager) PauseAll() {
 		}
 	}
 }
+
 func (d *DockerManager) UnpauseAll() {
 
 	for _, node := range d.nodes {

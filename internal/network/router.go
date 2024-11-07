@@ -15,6 +15,7 @@ type Router struct {
 	running         bool
 	queue           chan *xdp.Frame
 	ctx             chan struct{}
+	disrupted       disruptLogic
 }
 
 func CreateRouter(id string) *Router {
@@ -26,7 +27,11 @@ func CreateRouter(id string) *Router {
 		incomingChannel: make(chan *xdp.Frame, queueSize),
 		running:         false,
 		queue:           make(chan *xdp.Frame, queueSize),
-		ctx:             make(chan struct{}),
+		ctx:             make(chan struct{}, 2),
+		disrupted: disruptLogic{
+			disrupted: false,
+			ctx:       make(chan struct{}, 1),
+		},
 	}
 }
 
@@ -86,6 +91,32 @@ func (router *Router) Stop() {
 		router.running = false
 		router.ctx <- struct{}{}
 		router.ctx <- struct{}{}
+	}
+}
+
+func (router *Router) disrupt() {
+	if !router.disrupted.disrupted {
+		router.disrupted.disrupted = true
+		router.Stop()
+		go router.null()
+	}
+}
+
+func (router *Router) null() {
+	for {
+		select {
+		case <-router.disrupted.ctx:
+			return
+		case <-router.incomingChannel:
+			continue
+		}
+	}
+}
+
+func (router *Router) stopDisrupt() {
+	if router.disrupted.disrupted {
+		router.disrupted.ctx <- struct{}{}
+		router.Start()
 	}
 }
 

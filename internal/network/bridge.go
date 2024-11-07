@@ -16,6 +16,7 @@ type Bridge struct {
 	running         bool
 	queue           chan *xdp.Frame
 	ctx             chan struct{}
+	disrupted       disruptLogic
 }
 
 func CreateBridge() *Bridge {
@@ -27,9 +28,12 @@ func CreateBridge() *Bridge {
 		link:            nil,
 		running:         false,
 		queue:           make(chan *xdp.Frame, queueSize),
-		ctx:             make(chan struct{}),
+		ctx:             make(chan struct{}, 2),
+		disrupted: disruptLogic{
+			disrupted: false,
+			ctx:       make(chan struct{}, 1),
+		},
 	}
-	//return &Bridge{make(map[string]chan *xdp.Frame), make(chan *xdp.Frame, queueSize), nil, nil, false, make(chan *xdp.Frame, queueSize), make(chan struct{})}
 }
 
 func (bridge *Bridge) Gateway() chan *xdp.Frame {
@@ -105,6 +109,32 @@ func (bridge *Bridge) receive() {
 				fmt.Println("Queue Full!")
 			}
 		}
+	}
+}
+
+func (bridge *Bridge) disrupt() {
+	if !bridge.disrupted.disrupted {
+		bridge.disrupted.disrupted = true
+		bridge.Stop()
+		go bridge.null()
+	}
+}
+
+func (bridge *Bridge) null() {
+	for {
+		select {
+		case <-bridge.disrupted.ctx:
+			return
+		case <-bridge.incomingChannel:
+			continue
+		}
+	}
+}
+
+func (bridge *Bridge) stopDisrupt() {
+	if bridge.disrupted.disrupted {
+		bridge.disrupted.ctx <- struct{}{}
+		bridge.Start()
 	}
 }
 
