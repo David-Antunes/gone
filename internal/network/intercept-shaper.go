@@ -115,6 +115,7 @@ func (shaper *InterceptShaper) null() {
 func (shaper *InterceptShaper) StopDisrupt() bool {
 
 	if shaper.disrupted.disrupted {
+		shaper.disrupted.disrupted = false
 		shaper.disrupted.ctx <- struct{}{}
 		shaper.Start()
 		return true

@@ -71,6 +71,18 @@ func createDaemon(app *application.Leader, cd *cluster.ClusterDaemon, ipAddr str
 	m.HandleFunc("/stopIntercept", stopIntercept)
 	m.HandleFunc("/listIntercepts", listIntercepts)
 
+	m.HandleFunc("/disruptNode", disruptNode)
+	m.HandleFunc("/disruptBridge", disruptBridge)
+	m.HandleFunc("/disruptRouters", disruptRouters)
+	m.HandleFunc("/stopDisruptNode", stopDisruptNode)
+	m.HandleFunc("/stopDisruptBridge", stopDisruptBridge)
+	m.HandleFunc("/stopDisruptRouters", stopDisruptRouters)
+
+	m.HandleFunc("/stopBridge", stopBridge)
+	m.HandleFunc("/stopRouter", stopRouter)
+	m.HandleFunc("/startBridge", startBridge)
+	m.HandleFunc("/startRouter", startRouter)
+
 	m.HandleFunc("/pause", pause)
 	m.HandleFunc("/unpause", unpause)
 

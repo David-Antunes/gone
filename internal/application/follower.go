@@ -1966,3 +1966,135 @@ func (app *Follower) StopDisruptRouters(router1Id string, router2Id string) erro
 	}
 
 }
+func (app *Follower) StopBridge(id string) error {
+	if b, ok := app.topo.GetBridge(id); ok {
+		if b.MachineId == app.GetMachineId() {
+			if b.NetworkBridge.Disrupt() {
+				return nil
+			} else {
+				return errors.New("could not disrupt bridge")
+			}
+		} else {
+
+			resp, err := app.cl.SendMsg(b.MachineId, &opApi.StopBridgeRequest{Bridge: id}, "stopBridge")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &opApi.StopBridgeResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
+			return nil
+		}
+	} else {
+		return errors.New("invalid bridge id")
+	}
+}
+
+func (app *Follower) StopRouter(id string) error {
+
+	if r, ok := app.topo.GetRouter(id); ok {
+		if r.MachineId == app.GetMachineId() {
+			if r.NetworkRouter.Disrupt() {
+				return nil
+			} else {
+				return errors.New("could not disrupt router")
+			}
+		} else {
+
+			resp, err := app.cl.SendMsg(r.MachineId, &opApi.StopRouterRequest{Router: id}, "stopRouter")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &opApi.StopRouterResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
+			return nil
+		}
+	} else {
+		return errors.New("invalid router id")
+	}
+}
+func (app *Follower) StartBridge(id string) error {
+	if b, ok := app.topo.GetBridge(id); ok {
+		if b.MachineId == app.GetMachineId() {
+			if b.NetworkBridge.StopDisrupt() {
+				return nil
+			} else {
+				return errors.New("could not disrupt bridge")
+			}
+		} else {
+
+			resp, err := app.cl.SendMsg(b.MachineId, &opApi.StartBridgeRequest{Bridge: id}, "startBridge")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &opApi.StartBridgeResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
+			return nil
+		}
+	} else {
+		return errors.New("invalid bridge id")
+	}
+}
+
+func (app *Follower) StartRouter(id string) error {
+
+	if r, ok := app.topo.GetRouter(id); ok {
+		if r.MachineId == app.GetMachineId() {
+			if r.NetworkRouter.StopDisrupt() {
+				return nil
+			} else {
+				return errors.New("could not disrupt router")
+			}
+		} else {
+
+			resp, err := app.cl.SendMsg(r.MachineId, &opApi.StartRouterRequest{Router: id}, "startRouter")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &opApi.StartRouterResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
+			return nil
+		}
+	} else {
+		return errors.New("invalid router id")
+	}
+}

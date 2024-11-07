@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"sync"
+	"time"
 )
 
 type Bridge struct {
@@ -112,11 +113,21 @@ func (bridge *Bridge) receive() {
 	}
 }
 
-func (bridge *Bridge) disrupt() {
+func (bridge *Bridge) Disrupt() bool {
 	if !bridge.disrupted.disrupted {
 		bridge.disrupted.disrupted = true
 		bridge.Stop()
 		go bridge.null()
+
+		// Clear queue for requests
+		go func() {
+			go bridge.send()
+			time.Sleep(time.Second)
+			bridge.ctx <- struct{}{}
+		}()
+		return true
+	} else {
+		return false
 	}
 }
 
@@ -131,11 +142,14 @@ func (bridge *Bridge) null() {
 	}
 }
 
-func (bridge *Bridge) stopDisrupt() {
+func (bridge *Bridge) StopDisrupt() bool {
 	if bridge.disrupted.disrupted {
+		bridge.disrupted.disrupted = false
 		bridge.disrupted.ctx <- struct{}{}
 		bridge.Start()
+		return true
 	}
+	return false
 }
 
 func (bridge *Bridge) send() {

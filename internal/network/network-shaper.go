@@ -113,6 +113,7 @@ func (shaper *NetworkShaper) null() {
 func (shaper *NetworkShaper) StopDisrupt() bool {
 
 	if shaper.disrupted.disrupted {
+		shaper.disrupted.disrupted = false
 		shaper.disrupted.ctx <- struct{}{}
 		shaper.Start()
 		return true

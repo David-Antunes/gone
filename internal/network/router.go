@@ -5,6 +5,7 @@ import (
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"github.com/David-Antunes/gone/internal/network/routing"
 	"sync"
+	"time"
 )
 
 type Router struct {
@@ -94,12 +95,23 @@ func (router *Router) Stop() {
 	}
 }
 
-func (router *Router) Disrupt() {
+func (router *Router) Disrupt() bool {
 	if !router.disrupted.disrupted {
 		router.disrupted.disrupted = true
 		router.Stop()
 		go router.null()
+
+		// Clear queue for requests
+		go func() {
+			go router.send()
+			time.Sleep(time.Second)
+			router.ctx <- struct{}{}
+		}()
+		return true
+	} else {
+		return false
 	}
+
 }
 
 func (router *Router) null() {
@@ -113,10 +125,14 @@ func (router *Router) null() {
 	}
 }
 
-func (router *Router) StopDisrupt() {
+func (router *Router) StopDisrupt() bool {
 	if router.disrupted.disrupted {
+		router.disrupted.disrupted = false
 		router.disrupted.ctx <- struct{}{}
 		router.Start()
+		return true
+	} else {
+		return false
 	}
 }
 

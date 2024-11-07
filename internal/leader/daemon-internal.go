@@ -620,3 +620,346 @@ func unpause(w http.ResponseWriter, r *http.Request) {
 		Error: apiErrors.Error{},
 	})
 }
+
+func disruptNode(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.DisruptNodeRequest{}
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("disruptNode:", err)
+		daemon.SendError(w, &opApi.DisruptNodeResponse{
+			Node: req.Node,
+			Error: apiErrors.Error{
+				ErrCode: 1, ErrMsg: err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.DisruptNode(req.Node)
+
+	if err != nil {
+		daemonLog.Println("disruptNode:", err)
+		daemon.SendError(w, &opApi.DisruptNodeResponse{
+			Node: req.Node,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.DisruptNodeResponse{
+		Node:  req.Node,
+		Error: apiErrors.Error{},
+	})
+}
+func disruptBridge(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.DisruptBridgeRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("disruptBridge:", err)
+		daemon.SendError(w, &opApi.DisruptBridgeResponse{
+			Bridge: req.Bridge,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.DisruptBridge(req.Bridge)
+
+	if err != nil {
+		daemonLog.Println("disruptBridge:", err)
+		daemon.SendError(w, &opApi.DisruptBridgeResponse{
+			Bridge: req.Bridge,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.DisruptBridgeResponse{
+		Bridge: req.Bridge,
+		Error:  apiErrors.Error{},
+	})
+}
+func disruptRouters(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.DisruptRoutersRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("disruptRouters:", err)
+		daemon.SendError(w, &opApi.DisruptRoutersResponse{
+			Router1: req.Router1,
+			Router2: req.Router2,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.DisruptRouters(req.Router1, req.Router2)
+
+	if err != nil {
+		daemonLog.Println("disruptRouters:", err)
+		daemon.SendError(w, &opApi.DisruptRoutersResponse{
+			Router1: req.Router1,
+			Router2: req.Router2,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.DisruptRoutersResponse{
+		Router1: req.Router1,
+		Router2: req.Router2,
+		Error:   apiErrors.Error{},
+	})
+}
+func stopDisruptNode(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.DisruptNodeRequest{}
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("stopDisruptNode:", err)
+		daemon.SendError(w, &opApi.DisruptNodeResponse{
+			Node: req.Node,
+			Error: apiErrors.Error{
+				ErrCode: 1, ErrMsg: err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.StopDisruptNode(req.Node)
+
+	if err != nil {
+		daemonLog.Println("stopDisruptNode:", err)
+		daemon.SendError(w, &opApi.DisruptNodeResponse{
+			Node: req.Node,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.DisruptNodeResponse{
+		Node:  req.Node,
+		Error: apiErrors.Error{},
+	})
+}
+func stopDisruptBridge(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.DisruptBridgeRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("stopDisruptBridge:", err)
+		daemon.SendError(w, &opApi.DisruptBridgeResponse{
+			Bridge: req.Bridge,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.StopDisruptBridge(req.Bridge)
+
+	if err != nil {
+		daemonLog.Println("stopDisruptBridge:", err)
+		daemon.SendError(w, &opApi.DisruptBridgeResponse{
+			Bridge: req.Bridge,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.DisruptBridgeResponse{
+		Bridge: req.Bridge,
+		Error:  apiErrors.Error{},
+	})
+}
+func stopDisruptRouters(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.DisruptRoutersRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("stopDisruptRouters:", err)
+		daemon.SendError(w, &opApi.DisruptRoutersResponse{
+			Router1: req.Router1,
+			Router2: req.Router2,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.StopDisruptRouters(req.Router1, req.Router2)
+
+	if err != nil {
+		daemonLog.Println("stopDisruptRouters:", err)
+		daemon.SendError(w, &opApi.DisruptRoutersResponse{
+			Router1: req.Router1,
+			Router2: req.Router2,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.DisruptRoutersResponse{
+		Router1: req.Router1,
+		Router2: req.Router2,
+		Error:   apiErrors.Error{},
+	})
+}
+func startBridge(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.StartBridgeRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("startBridge:", err)
+		daemon.SendError(w, &opApi.StartBridgeResponse{
+			Bridge: req.Bridge,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.StartBridge(req.Bridge)
+
+	if err != nil {
+		daemonLog.Println("startBridge:", err)
+		daemon.SendError(w, &opApi.StartBridgeResponse{
+			Bridge: req.Bridge,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.StopBridgeResponse{
+		Bridge: req.Bridge,
+		Error:  apiErrors.Error{},
+	})
+}
+func startRouter(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.StartRouterRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("startRouter:", err)
+		daemon.SendError(w, &opApi.StartRouterResponse{
+			Router: req.Router,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.StartRouter(req.Router)
+
+	if err != nil {
+		daemonLog.Println("startRouter:", err)
+		daemon.SendError(w, &opApi.StartRouterResponse{
+			Router: req.Router,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.StartRouterResponse{
+		Router: req.Router,
+		Error:  apiErrors.Error{},
+	})
+}
+func stopBridge(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.StopBridgeRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("stopBridge:", err)
+		daemon.SendError(w, &opApi.StopBridgeResponse{
+			Bridge: req.Bridge,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.StopBridge(req.Bridge)
+
+	if err != nil {
+		daemonLog.Println("stopBridge:", err)
+		daemon.SendError(w, &opApi.StopBridgeResponse{
+			Bridge: req.Bridge,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.DisruptBridgeResponse{
+		Bridge: req.Bridge,
+		Error:  apiErrors.Error{},
+	})
+}
+func stopRouter(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.StopRouterRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("stopRouter:", err)
+		daemon.SendError(w, &opApi.StopRouterResponse{
+			Router: req.Router,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.StopRouter(req.Router)
+
+	if err != nil {
+		daemonLog.Println("stopRouter:", err)
+		daemon.SendError(w, &opApi.StopRouterResponse{
+			Router: req.Router,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.StopRouterResponse{
+		Router: req.Router,
+		Error:  apiErrors.Error{},
+	})
+}
