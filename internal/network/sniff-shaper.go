@@ -196,3 +196,24 @@ func (shaper *SniffShaper) ConvertToNetworkShaper() *NetworkShaper {
 		ctx:       shaper.ctx,
 	}
 }
+func (shaper *SniffShaper) Close() {
+	shaper.Stop()
+	shaper.StopDisrupt()
+}
+func (shaper *SniffShaper) Pause() {
+	if shaper.running {
+		shaper.ctx <- struct{}{}
+		shaper.ctx <- struct{}{}
+	} else if shaper.disrupted.disrupted {
+		shaper.disrupted.ctx <- struct{}{}
+	}
+}
+
+func (shaper *SniffShaper) Unpause() {
+	if shaper.running {
+		go shaper.receive()
+		go shaper.send()
+	} else if shaper.disrupted.disrupted {
+		go shaper.null()
+	}
+}

@@ -14,7 +14,7 @@ type Cluster struct {
 	Primary   string
 	Nodes     map[string]ClusterNode
 	Endpoints map[string]net.Conn
-	Rtt       *ClusterRTTManager
+	Rtt       *RemoteRTTManager
 }
 
 type ClusterNode struct {

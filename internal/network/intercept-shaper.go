@@ -199,3 +199,25 @@ func (shaper *InterceptShaper) ConvertToNetworkShaper() *NetworkShaper {
 		ctx:       shaper.ctx,
 	}
 }
+func (shaper *InterceptShaper) Close() {
+	shaper.Stop()
+	shaper.StopDisrupt()
+}
+
+func (shaper *InterceptShaper) Pause() {
+	if shaper.running {
+		shaper.ctx <- struct{}{}
+		shaper.ctx <- struct{}{}
+	} else if shaper.disrupted.disrupted {
+		shaper.disrupted.ctx <- struct{}{}
+	}
+}
+
+func (shaper *InterceptShaper) Unpause() {
+	if shaper.running {
+		go shaper.receive()
+		go shaper.send()
+	} else if shaper.disrupted.disrupted {
+		go shaper.null()
+	}
+}

@@ -69,3 +69,15 @@ func (shaper *NullShaper) Disrupt() bool {
 func (shaper *NullShaper) StopDisrupt() bool {
 	return true
 }
+func (shaper *NullShaper) Close() {
+	shaper.Stop()
+	shaper.StopDisrupt()
+}
+
+func (shaper *NullShaper) Pause() {
+	shaper.Stop()
+}
+
+func (shaper *NullShaper) Unpause() {
+	shaper.Start()
+}

@@ -30,11 +30,11 @@ type Leader struct {
 	proxy           *proxy.Proxy
 	topo            *topology.Topology
 	icm             *cluster.InterCommunicationManager
-	rm              *RttManager
+	rm              *LocalRttManager
 	redirectManager *redirecttraffic.RedirectManager
 }
 
-func NewLeader(cl *cluster.Cluster, dm *docker.DockerManager, proxy *proxy.Proxy, icm *cluster.InterCommunicationManager, rm *RttManager) *Leader {
+func NewLeader(cl *cluster.Cluster, dm *docker.DockerManager, proxy *proxy.Proxy, icm *cluster.InterCommunicationManager, rm *LocalRttManager) *Leader {
 	return &Leader{
 		cl:              cl,
 		dm:              dm,
@@ -93,12 +93,12 @@ func (app *Leader) clearSniffLink(id string) error {
 			bilink := sniffer.Component.(*topology.BiLink).NetworkBILink
 
 			// Convert to individual Link
-			bilink.Left.GetShaper().Stop()
+			bilink.Left.GetShaper().Close()
 			l := bilink.Left.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
 			bilink.Left.SetShaper(l)
 			l.Start()
 
-			bilink.Right.GetShaper().Stop()
+			bilink.Right.GetShaper().Close()
 			r := bilink.Right.GetShaper().(*network.SniffShaper).ConvertToNetworkShaper()
 			bilink.Right.SetShaper(l)
 			r.Start()
@@ -120,7 +120,7 @@ func (app *Leader) clearInterceptLink(id string) error {
 			// Convert to network link
 			link := intercept.Component.(*topology.Link).NetworkLink
 
-			link.GetShaper().Stop()
+			link.GetShaper().Close()
 			l := link.GetShaper().(*network.InterceptShaper).ConvertToNetworkShaper()
 			link.SetShaper(l)
 			l.Start()
@@ -134,7 +134,7 @@ func (app *Leader) gcLinkShaper(link *network.BiLink) error {
 
 	if link.Left != nil {
 
-		link.Left.Stop()
+		link.Left.Close()
 		if s, ok := link.Left.GetShaper().(*network.SniffShaper); ok {
 			_ = app.redirectManager.RemoveSniffer(s.GetRtID())
 		}
@@ -148,7 +148,7 @@ func (app *Leader) gcLinkShaper(link *network.BiLink) error {
 	}
 
 	if link.Right != nil {
-		link.Right.Stop()
+		link.Right.Close()
 		if s, ok := link.Right.GetShaper().(*network.SniffShaper); ok {
 			_ = app.redirectManager.RemoveSniffer(s.GetRtID())
 		}
@@ -1310,16 +1310,16 @@ func (app *Leader) SniffNode(nodeId string, id string) (string, string, string, 
 
 		app.redirectManager.AddSniffer(id, sniffComponent)
 
-		n.Link.NetworkBILink.Left.Stop()
-		n.Link.NetworkBILink.Right.Stop()
+		n.Link.NetworkBILink.Left.Pause()
+		n.Link.NetworkBILink.Right.Pause()
 
 		newSniff := n.Link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		n.Link.NetworkBILink.Left.SetShaper(newSniff)
-		n.Link.NetworkBILink.Left.Start()
+		n.Link.NetworkBILink.Left.Unpause()
 
 		newSniff = n.Link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		n.Link.NetworkBILink.Right.SetShaper(newSniff)
-		n.Link.NetworkBILink.Right.Start()
+		n.Link.NetworkBILink.Right.Unpause()
 
 		n.Link.ConnectsFrom.NetworkLink = n.Link.NetworkBILink.Left
 		n.Link.ConnectsTo.NetworkLink = n.Link.NetworkBILink.Right
@@ -1402,16 +1402,16 @@ func (app *Leader) SniffBridge(bridgeId string, id string) (string, string, stri
 		}
 		app.redirectManager.AddSniffer(id, sniffComponent)
 
-		b.RouterLink.NetworkBILink.Left.Stop()
-		b.RouterLink.NetworkBILink.Right.Stop()
+		b.RouterLink.NetworkBILink.Left.Pause()
+		b.RouterLink.NetworkBILink.Right.Pause()
 
 		newSniff := b.RouterLink.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		b.RouterLink.NetworkBILink.Left.SetShaper(newSniff)
-		b.RouterLink.NetworkBILink.Left.Start()
+		b.RouterLink.NetworkBILink.Left.Unpause()
 
 		newSniff = b.RouterLink.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 		b.RouterLink.NetworkBILink.Right.SetShaper(newSniff)
-		b.RouterLink.NetworkBILink.Right.Start()
+		b.RouterLink.NetworkBILink.Right.Unpause()
 
 		b.RouterLink.ConnectsFrom.NetworkLink = b.RouterLink.NetworkBILink.Left
 		b.RouterLink.ConnectsTo.NetworkLink = b.RouterLink.NetworkBILink.Right
@@ -1499,16 +1499,16 @@ func (app *Leader) SniffRouters(router1 string, router2 string, id string) (stri
 
 			app.redirectManager.AddSniffer(id, sniffComponent)
 
-			link.NetworkBILink.Left.Stop()
-			link.NetworkBILink.Right.Stop()
+			link.NetworkBILink.Left.Pause()
+			link.NetworkBILink.Right.Pause()
 
 			newSniff := link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 			link.NetworkBILink.Left.SetShaper(newSniff)
-			link.NetworkBILink.Left.Start()
+			link.NetworkBILink.Left.Unpause()
 
 			newSniff = link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToSniffShaper(sniffComponent)
 			link.NetworkBILink.Right.SetShaper(newSniff)
-			link.NetworkBILink.Right.Start()
+			link.NetworkBILink.Right.Unpause()
 
 			link.ConnectsFrom.NetworkLink = link.NetworkBILink.Left
 			link.ConnectsTo.NetworkLink = link.NetworkBILink.Right
@@ -1597,11 +1597,11 @@ func (app *Leader) InterceptNode(nodeId string, id string, direction bool) (stri
 				Component: n.Link.ConnectsFrom,
 			}
 
-			n.Link.NetworkBILink.Left.Stop()
+			n.Link.NetworkBILink.Left.Pause()
 
 			intercept := n.Link.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			n.Link.NetworkBILink.Left.SetShaper(intercept)
-			n.Link.NetworkBILink.Left.Start()
+			n.Link.NetworkBILink.Left.Unpause()
 			n.Link.ConnectsFrom.NetworkLink = n.Link.NetworkBILink.Left
 
 		} else {
@@ -1621,10 +1621,10 @@ func (app *Leader) InterceptNode(nodeId string, id string, direction bool) (stri
 				Component: n.Link.ConnectsTo,
 			}
 
-			n.Link.NetworkBILink.Right.Stop()
+			n.Link.NetworkBILink.Right.Pause()
 			intercept := n.Link.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			n.Link.NetworkBILink.Right.SetShaper(intercept)
-			n.Link.NetworkBILink.Right.Start()
+			n.Link.NetworkBILink.Right.Unpause()
 			n.Link.ConnectsTo.NetworkLink = n.Link.NetworkBILink.Right
 
 		}
@@ -1708,11 +1708,11 @@ func (app *Leader) InterceptBridge(bridgeId string, id string, direction bool) (
 				Socket:    redirect,
 				Component: b.RouterLink.ConnectsFrom,
 			}
-			b.RouterLink.NetworkBILink.Left.Stop()
+			b.RouterLink.NetworkBILink.Left.Pause()
 
 			intercept := b.RouterLink.NetworkBILink.Left.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			b.RouterLink.NetworkBILink.Left.SetShaper(intercept)
-			b.RouterLink.NetworkBILink.Left.Start()
+			b.RouterLink.NetworkBILink.Left.Unpause()
 			b.RouterLink.ConnectsFrom.NetworkLink = b.RouterLink.NetworkBILink.Left
 
 		} else {
@@ -1732,11 +1732,11 @@ func (app *Leader) InterceptBridge(bridgeId string, id string, direction bool) (
 				Component: b.RouterLink.ConnectsTo,
 			}
 
-			b.RouterLink.NetworkBILink.Right.Stop()
+			b.RouterLink.NetworkBILink.Right.Pause()
 
 			intercept := b.RouterLink.NetworkBILink.Right.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 			b.RouterLink.NetworkBILink.Right.SetShaper(intercept)
-			b.RouterLink.NetworkBILink.Right.Start()
+			b.RouterLink.NetworkBILink.Right.Unpause()
 			b.RouterLink.ConnectsTo.NetworkLink = b.RouterLink.NetworkBILink.Right
 		}
 
@@ -1831,11 +1831,11 @@ func (app *Leader) InterceptRouters(router1 string, router2 string, id string, d
 						Component: link.ConnectsFrom,
 					}
 
-					link.ConnectsFrom.NetworkLink.Stop()
+					link.ConnectsFrom.NetworkLink.Pause()
 
 					intercept := link.ConnectsFrom.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsFrom.NetworkLink.SetShaper(intercept)
-					link.ConnectsFrom.NetworkLink.Start()
+					link.ConnectsFrom.NetworkLink.Unpause()
 
 				} else {
 					if isSpecialLink(link.ConnectsTo) {
@@ -1855,11 +1855,11 @@ func (app *Leader) InterceptRouters(router1 string, router2 string, id string, d
 						Component: link.ConnectsTo,
 					}
 
-					link.ConnectsTo.NetworkLink.Stop()
+					link.ConnectsTo.NetworkLink.Pause()
 
 					intercept := link.ConnectsTo.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsTo.NetworkLink.SetShaper(intercept)
-					link.ConnectsTo.NetworkLink.Start()
+					link.ConnectsTo.NetworkLink.Unpause()
 				}
 			} else {
 				if direction {
@@ -1880,11 +1880,11 @@ func (app *Leader) InterceptRouters(router1 string, router2 string, id string, d
 						Component: link.ConnectsTo,
 					}
 
-					link.ConnectsTo.NetworkLink.Stop()
+					link.ConnectsTo.NetworkLink.Pause()
 
 					intercept := link.ConnectsTo.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsTo.NetworkLink.SetShaper(intercept)
-					link.ConnectsTo.NetworkLink.Start()
+					link.ConnectsTo.NetworkLink.Unpause()
 
 				} else {
 					if isSpecialLink(link.ConnectsFrom) {
@@ -1905,11 +1905,11 @@ func (app *Leader) InterceptRouters(router1 string, router2 string, id string, d
 						Component: link.ConnectsFrom,
 					}
 
-					link.ConnectsFrom.NetworkLink.Stop()
+					link.ConnectsFrom.NetworkLink.Pause()
 
 					intercept := link.ConnectsFrom.NetworkLink.GetShaper().(*network.NetworkShaper).ConvertToInterceptShaper(interceptComponent)
 					link.ConnectsFrom.NetworkLink.SetShaper(intercept)
-					link.ConnectsFrom.NetworkLink.Start()
+					link.ConnectsFrom.NetworkLink.Unpause()
 				}
 			}
 

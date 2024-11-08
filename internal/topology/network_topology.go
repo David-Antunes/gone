@@ -252,7 +252,7 @@ func (topo *Topology) ConnectNodeToBridge(nodeID string, bridgeID string, linkPr
 		b.AddNode(n, link)
 		return link, nil
 	}
-	n.NetworkNode.GetLink().Left.Stop()
+	n.NetworkNode.GetLink().Left.Close()
 	biLink := network.ConnectNodeToBridge(n.NetworkNode, b.NetworkBridge, linkProps)
 	topoLink := topo.registerBiLink(n, b, biLink)
 	n.SetBridge(b, topoLink)
@@ -396,7 +396,7 @@ func (topo *Topology) RemoveNode(nodeId string) (*Node, error) {
 		delete(topo.links, n.Link.ID())
 		topo.removeNodeFromRouters([]byte(n.NetworkNode.GetMac()))
 	} else {
-		n.Link.NetworkBILink.Left.Stop()
+		n.Link.NetworkBILink.Left.Close()
 	}
 
 	topo.fl.RemoveMac([]byte(n.NetworkNode.GetMac()))
@@ -428,7 +428,7 @@ func (topo *Topology) RemoveBridge(bridgeId string) (*Bridge, error) {
 		return b, nil
 	}
 
-	b.NetworkBridge.Stop()
+	b.NetworkBridge.Close()
 	if b.NetworkBridge.Link() != nil {
 		b.Router.RemoveBridge(b.ID())
 		delete(topo.links, b.RouterLink.ID())
@@ -471,7 +471,7 @@ func (topo *Topology) RemoveRouter(routerId string) (*Router, error) {
 		return r, nil
 	}
 
-	r.NetworkRouter.Stop()
+	r.NetworkRouter.Close()
 	for _, bridge := range r.ConnectedBridges {
 		macs := bridge.NetworkBridge.GetMacs()
 		for _, mac := range macs {
@@ -484,19 +484,6 @@ func (topo *Topology) RemoveRouter(routerId string) (*Router, error) {
 		bridge.RemoveRouter()
 	}
 
-	//for _, router := range topo.routers {
-	//	if len(router.ConnectedBridges) > 0 {
-	//		router.NetworkRouter.ClearRoutes()
-	//		router.Weights = make(map[string]Weight)
-	//		for _, bridge := range router.ConnectedBridges {
-	//			newWeight := int(bridge.RouterLink.NetworkBILink.Left.GetProps().Latency / time.Millisecond)
-	//			for _, mac := range bridge.NetworkBridge.GetMacs() {
-	//				router.NetworkRouter.AddNode(mac, GetOriginChanFromLink(router.Id, bridge.RouterLink))
-	//				router.AddWeight(string(mac), router.Id, newWeight)
-	//			}
-	//		}
-	//	}
-	//}
 	return r, nil
 }
 
@@ -571,7 +558,7 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 	if r1.MachineId == topo.machineId && r2.MachineId == topo.machineId {
 
 		link, ok := r1.RouterLinks[router2]
-		link.NetworkBILink.Stop()
+		link.NetworkBILink.Close()
 
 		if !ok {
 			return errors.New(router1 + " and " + router2 + " are not connected")
@@ -588,12 +575,12 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 				weights = append(weights, mac)
 			}
 		}
-		r1.NetworkRouter.Stop()
+		r1.NetworkRouter.Pause()
 		for _, mac := range weights {
 			r1.RemoveWeight(mac)
 			r1.NetworkRouter.RemoveNode([]byte(mac))
 		}
-		r1.NetworkRouter.Start()
+		r1.NetworkRouter.Unpause()
 
 		weights = make([]string, 0, len(r1.Weights))
 
@@ -602,12 +589,12 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 				weights = append(weights, mac)
 			}
 		}
-		r2.NetworkRouter.Stop()
+		r2.NetworkRouter.Pause()
 		for _, mac := range weights {
 			r2.RemoveWeight(mac)
 			r2.NetworkRouter.RemoveNode([]byte(mac))
 		}
-		r2.NetworkRouter.Start()
+		r2.NetworkRouter.Unpause()
 
 	} else if r1.MachineId == topo.machineId && r2.MachineId != topo.machineId {
 		link, ok := r1.RouterLinks[router2]
@@ -622,7 +609,7 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 		delete(r2.RouterLinks, router1)
 		delete(r2.ConnectedRouters, router1)
 
-		link.ConnectsTo.NetworkLink.Stop()
+		link.ConnectsTo.NetworkLink.Close()
 
 		weights := make([]string, 0, len(r1.Weights))
 
@@ -631,12 +618,12 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 				weights = append(weights, mac)
 			}
 		}
-		r1.NetworkRouter.Stop()
+		r1.NetworkRouter.Pause()
 		for _, mac := range weights {
 			r1.RemoveWeight(mac)
 			r1.NetworkRouter.RemoveNode([]byte(mac))
 		}
-		r1.NetworkRouter.Start()
+		r1.NetworkRouter.Unpause()
 
 	} else if r2.MachineId == topo.machineId && r1.MachineId != topo.machineId {
 		link, ok := r2.RouterLinks[router1]
@@ -651,7 +638,7 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 		delete(r2.RouterLinks, router1)
 		delete(r2.ConnectedRouters, router1)
 
-		link.ConnectsTo.NetworkLink.Stop()
+		link.ConnectsTo.NetworkLink.Close()
 
 		weights := make([]string, 0, len(r1.Weights))
 
@@ -660,12 +647,12 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 				weights = append(weights, mac)
 			}
 		}
-		r2.NetworkRouter.Stop()
+		r2.NetworkRouter.Pause()
 		for _, mac := range weights {
 			r2.RemoveWeight(mac)
 			r2.NetworkRouter.RemoveNode([]byte(mac))
 		}
-		r2.NetworkRouter.Start()
+		r2.NetworkRouter.Unpause()
 	}
 	return nil
 }
@@ -678,7 +665,7 @@ func (topo *Topology) ForgetRoutes(routerId string) error {
 		return errors.New(routerId + " ID doesn't exist")
 	}
 
-	r.NetworkRouter.Stop()
+	r.NetworkRouter.Pause()
 	r.NetworkRouter.ClearRoutes()
 
 	r.Weights = make(map[string]Weight)
@@ -689,6 +676,6 @@ func (topo *Topology) ForgetRoutes(routerId string) error {
 			r.AddWeight(node.NetworkNode.GetMac(), r.ID(), 0)
 		}
 	}
-	r.NetworkRouter.Start()
+	r.NetworkRouter.Unpause()
 	return nil
 }

@@ -11,14 +11,14 @@ import (
 	"time"
 )
 
-type RttManager struct {
+type LocalRttManager struct {
 	conn    net.Conn
 	rtt     *network.DynamicDelay
 	timeout time.Duration
 }
 
-func NewRttManager(conn net.Conn, timeout time.Duration) *RttManager {
-	return &RttManager{
+func NewRttManager(conn net.Conn, timeout time.Duration) *LocalRttManager {
+	return &LocalRttManager{
 		conn: conn,
 		rtt: &network.DynamicDelay{
 			ReceiveDelay:  &network.Delay{Value: time.Duration(0)},
@@ -28,7 +28,7 @@ func NewRttManager(conn net.Conn, timeout time.Duration) *RttManager {
 	}
 }
 
-func (rm *RttManager) Start() {
+func (rm *LocalRttManager) Start() {
 	dec := gob.NewDecoder(rm.conn)
 	for {
 		var rtt *api.UpdateRTTRequest
@@ -49,10 +49,10 @@ func (rm *RttManager) Start() {
 		}
 	}
 }
-func (rm *RttManager) Stop() {
+func (rm *LocalRttManager) Stop() {
 	rm.conn.Close()
 }
 
-func (rm *RttManager) GetRtt() *network.DynamicDelay {
+func (rm *LocalRttManager) GetRtt() *network.DynamicDelay {
 	return rm.rtt
 }

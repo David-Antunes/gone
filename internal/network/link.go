@@ -35,6 +35,17 @@ func (link *Link) Stop() {
 	link.shaper.Stop()
 }
 
+func (link *Link) Pause() {
+	link.shaper.Pause()
+}
+func (link *Link) Unpause() {
+	link.shaper.Unpause()
+}
+
+func (link *Link) Close() {
+	link.shaper.Close()
+}
+
 func (link *Link) GetOriginChan() chan *xdp.Frame {
 	return link.originChan
 }

@@ -234,3 +234,30 @@ func (shaper *NetworkShaper) ConvertToInterceptShaper(rt *redirect_traffic.Inter
 		disrupted: shaper.disrupted,
 	}
 }
+
+func (shaper *NetworkShaper) Close() {
+	shaper.Stop()
+	shaper.StopDisrupt()
+}
+
+func (shaper *NetworkShaper) Pause() {
+	if shaper.running {
+		shaper.ctx <- struct{}{}
+		shaper.ctx <- struct{}{}
+	} else if shaper.disrupted.disrupted {
+		shaper.disrupted.ctx <- struct{}{}
+	}
+}
+
+func (shaper *NetworkShaper) Unpause() {
+	if shaper.running {
+		if shaper.props.Latency == 0 && shaper.props.Jitter == 0.0 && shaper.props.DropRate == 0.0 {
+			go shaper.receiveNoLatency()
+		} else {
+			go shaper.receiveLatency()
+		}
+		go shaper.send()
+	} else if shaper.disrupted.disrupted {
+		go shaper.null()
+	}
+}

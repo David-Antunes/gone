@@ -28,7 +28,7 @@ func (bridge *Bridge) RemoveNode(nodeId string) {
 	if link, ok := bridge.NodeLinks[nodeId]; ok {
 		n := bridge.ConnectedNodes[nodeId]
 		bridge.NetworkBridge.RemoveNode([]byte(n.NetworkNode.GetMac()))
-		link.NetworkBILink.Stop()
+		link.NetworkBILink.Close()
 		delete(bridge.ConnectedNodes, nodeId)
 		delete(bridge.NodeLinks, nodeId)
 	}
@@ -41,7 +41,7 @@ func (bridge *Bridge) SetRouter(router *Router, link *BiLink) {
 func (bridge *Bridge) RemoveRouter() {
 	if bridge.Router != nil {
 		bridge.Router = nil
-		bridge.RouterLink.NetworkBILink.Stop()
+		bridge.RouterLink.NetworkBILink.Close()
 		bridge.RouterLink = nil
 		bridge.NetworkBridge.SetGateway(network.GetNullChan())
 	}

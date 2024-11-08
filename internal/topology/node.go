@@ -24,7 +24,7 @@ func (node *Node) SetBridge(bridge *Bridge, link *BiLink) *Node {
 func (node *Node) RemoveBridge() {
 
 	if node.Bridge != nil {
-		node.Link.NetworkBILink.Stop()
+		node.Link.NetworkBILink.Close()
 		node.NetworkNode.SetLink(nil)
 		node.Bridge.RemoveNode(node.Id)
 		node.Bridge = nil

@@ -9,6 +9,9 @@ type Shaper interface {
 	Disrupt() bool
 	StopDisrupt() bool
 	Stop()
+	Close()
+	Pause()
+	Unpause()
 }
 
 type DynamicDelay struct {

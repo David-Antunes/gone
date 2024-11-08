@@ -30,7 +30,7 @@ func (router *Router) AddBridge(bridge *Bridge, link *BiLink) {
 func (router *Router) RemoveBridge(bridgeId string) {
 
 	if link, ok := router.BridgeLinks[bridgeId]; ok {
-		link.NetworkBILink.Stop()
+		link.NetworkBILink.Close()
 		delete(router.ConnectedBridges, bridgeId)
 		delete(router.BridgeLinks, bridgeId)
 	}
@@ -39,7 +39,7 @@ func (router *Router) RemoveBridge(bridgeId string) {
 func (router *Router) RemoveRouter(routerId string) {
 
 	if link, ok := router.RouterLinks[routerId]; ok {
-		link.NetworkBILink.Stop()
+		link.NetworkBILink.Close()
 		delete(router.ConnectedRouters, routerId)
 		delete(router.RouterLinks, routerId)
 	}

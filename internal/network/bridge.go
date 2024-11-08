@@ -88,6 +88,7 @@ func (bridge *Bridge) Start() {
 		go bridge.send()
 	}
 }
+
 func (bridge *Bridge) Stop() {
 	if bridge.running {
 		bridge.running = false
@@ -177,5 +178,28 @@ func (bridge *Bridge) send() {
 			}
 			bridge.RUnlock()
 		}
+	}
+}
+
+func (bridge *Bridge) Close() {
+	bridge.Stop()
+	bridge.StopDisrupt()
+}
+
+func (bridge *Bridge) Pause() {
+	if bridge.running {
+		bridge.ctx <- struct{}{}
+		bridge.ctx <- struct{}{}
+	} else if bridge.disrupted.disrupted {
+		bridge.disrupted.ctx <- struct{}{}
+	}
+}
+
+func (bridge *Bridge) Unpause() {
+	if bridge.running {
+		go bridge.receive()
+		go bridge.send()
+	} else if bridge.disrupted.disrupted {
+		go bridge.null()
 	}
 }

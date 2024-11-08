@@ -43,3 +43,17 @@ func (link *BiLink) StopDisrupt() bool {
 	link.Left.StopDisrupt()
 	return link.Right.StopDisrupt()
 }
+func (link *BiLink) Close() {
+	link.Left.Close()
+	link.Right.Close()
+}
+
+func (link *BiLink) Pause() {
+	link.Left.Pause()
+	link.Right.Pause()
+}
+
+func (link *BiLink) Unpause() {
+	link.Left.Unpause()
+	link.Right.Unpause()
+}

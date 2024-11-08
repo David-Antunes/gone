@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type ClusterRTTManager struct {
+type RemoteRTTManager struct {
 	endpoints map[string]*nodeRTT
 	numObs    int
 	timeout   time.Duration
@@ -22,15 +22,15 @@ type nodeRTT struct {
 	delay  *network.Delay
 }
 
-func NewClusterRTTManager(numObs int, timeout time.Duration) *ClusterRTTManager {
-	return &ClusterRTTManager{
+func NewClusterRTTManager(numObs int, timeout time.Duration) *RemoteRTTManager {
+	return &RemoteRTTManager{
 		endpoints: make(map[string]*nodeRTT),
 		numObs:    numObs,
 		timeout:   timeout,
 	}
 }
 
-func (rtt *ClusterRTTManager) GetDelay(id string) (*network.Delay, error) {
+func (rtt *RemoteRTTManager) GetDelay(id string) (*network.Delay, error) {
 	if node, ok := rtt.endpoints[id]; !ok {
 		return nil, errors.New("node not found")
 	} else {
@@ -38,7 +38,7 @@ func (rtt *ClusterRTTManager) GetDelay(id string) (*network.Delay, error) {
 	}
 }
 
-func (rtt *ClusterRTTManager) AddNode(id string, ip string) {
+func (rtt *RemoteRTTManager) AddNode(id string, ip string) {
 	delay := &network.Delay{
 		Value: 0,
 	}

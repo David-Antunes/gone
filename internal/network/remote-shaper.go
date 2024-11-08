@@ -139,3 +139,15 @@ func (shaper *RemoteShaper) Disrupt() bool {
 func (shaper *RemoteShaper) StopDisrupt() bool {
 	return true
 }
+
+func (shaper *RemoteShaper) Close() {
+	shaper.Stop()
+	shaper.StopDisrupt()
+}
+func (shaper *RemoteShaper) Pause() {
+	shaper.Stop()
+}
+
+func (shaper *RemoteShaper) Unpause() {
+	shaper.Start()
+}

@@ -79,41 +79,6 @@ func (router *Router) ClearRoutes() {
 	router.Unlock()
 }
 
-func (router *Router) Start() {
-	if !router.running {
-		router.running = true
-		go router.receive()
-		go router.send()
-	}
-}
-
-func (router *Router) Stop() {
-	if router.running {
-		router.running = false
-		router.ctx <- struct{}{}
-		router.ctx <- struct{}{}
-	}
-}
-
-func (router *Router) Disrupt() bool {
-	if !router.disrupted.disrupted {
-		router.disrupted.disrupted = true
-		router.Stop()
-		go router.null()
-
-		// Clear queue for requests
-		go func() {
-			go router.send()
-			time.Sleep(time.Second)
-			router.ctx <- struct{}{}
-		}()
-		return true
-	} else {
-		return false
-	}
-
-}
-
 func (router *Router) null() {
 	for {
 		select {
@@ -122,17 +87,6 @@ func (router *Router) null() {
 		case <-router.incomingChannel:
 			continue
 		}
-	}
-}
-
-func (router *Router) StopDisrupt() bool {
-	if router.disrupted.disrupted {
-		router.disrupted.disrupted = false
-		router.disrupted.ctx <- struct{}{}
-		router.Start()
-		return true
-	} else {
-		return false
 	}
 }
 
@@ -179,5 +133,73 @@ func (router *Router) InjectFrame(frame *xdp.Frame) {
 	} else {
 		router.RUnlock()
 		routing.HandleNewMac(frame, router.id)
+	}
+}
+
+func (router *Router) Close() {
+	router.Stop()
+	router.StopDisrupt()
+}
+func (router *Router) Start() {
+	if !router.running {
+		router.running = true
+		go router.receive()
+		go router.send()
+	}
+}
+
+func (router *Router) Stop() {
+	if router.running {
+		router.running = false
+		router.ctx <- struct{}{}
+		router.ctx <- struct{}{}
+	}
+}
+
+func (router *Router) Pause() {
+	if router.running {
+		router.ctx <- struct{}{}
+		router.ctx <- struct{}{}
+	} else if router.disrupted.disrupted {
+		router.disrupted.ctx <- struct{}{}
+	}
+}
+
+func (router *Router) Unpause() {
+	if router.running {
+		go router.receive()
+		go router.send()
+	} else if router.disrupted.disrupted {
+		go router.null()
+	}
+}
+
+func (router *Router) Disrupt() bool {
+	if !router.disrupted.disrupted {
+		router.disrupted.disrupted = true
+		router.Stop()
+		go router.null()
+
+		// Clear queue for requests
+		go func() {
+			go router.send()
+			time.Sleep(time.Second)
+			router.ctx <- struct{}{}
+		}()
+		return true
+	} else {
+		return false
+	}
+
+}
+
+func (router *Router) StopDisrupt() bool {
+	if router.disrupted.disrupted {
+		router.disrupted.disrupted = false
+		router.disrupted.ctx <- struct{}{}
+		router.Start()
+		return true
+	} else {
+		return false
 	}
 }
