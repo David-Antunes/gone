@@ -126,34 +126,34 @@ func (app *Follower) clearInterceptLink(id string) error {
 }
 
 // Garbage collects shapers
-func (app *Follower) gcLinkShaper(link *network.BiLink) error {
+func (app *Follower) gcLinkShaper(link *topology.BiLink) error {
 
-	if link.Left != nil {
+	if link.ConnectsTo != nil {
 
-		link.Left.Close()
-		if s, ok := link.Left.GetShaper().(*network.SniffShaper); ok {
+		link.ConnectsTo.NetworkLink.Close()
+		if s, ok := link.ConnectsTo.NetworkLink.GetShaper().(*network.SniffShaper); ok {
 			_ = app.redirectManager.RemoveSniffer(s.GetRtID())
 		}
 
-		if s, ok := link.Left.GetShaper().(*network.InterceptShaper); ok {
+		if s, ok := link.ConnectsTo.NetworkLink.GetShaper().(*network.InterceptShaper); ok {
 			_ = app.redirectManager.RemoveIntercept(s.GetRtID())
 		}
-		if s, ok := link.Left.GetShaper().(*network.RemoteShaper); ok {
+		if s, ok := link.ConnectsTo.NetworkLink.GetShaper().(*network.RemoteShaper); ok {
 			app.icm.RemoveConnection(s.To, s.From)
 		}
 	}
 
-	if link.Right != nil {
-		link.Right.Close()
-		if s, ok := link.Right.GetShaper().(*network.SniffShaper); ok {
+	if link.ConnectsFrom != nil {
+		link.ConnectsFrom.NetworkLink.Close()
+		if s, ok := link.ConnectsFrom.NetworkLink.GetShaper().(*network.SniffShaper); ok {
 			_ = app.redirectManager.RemoveSniffer(s.GetRtID())
 		}
 
-		if s, ok := link.Right.GetShaper().(*network.InterceptShaper); ok {
+		if s, ok := link.ConnectsFrom.NetworkLink.GetShaper().(*network.InterceptShaper); ok {
 			_ = app.redirectManager.RemoveIntercept(s.GetRtID())
 		}
 
-		if s, ok := link.Right.GetShaper().(*network.RemoteShaper); ok {
+		if s, ok := link.ConnectsFrom.NetworkLink.GetShaper().(*network.RemoteShaper); ok {
 			app.icm.RemoveConnection(s.To, s.From)
 		}
 	}
@@ -495,7 +495,7 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 func (app *Follower) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 
 	biLink := r1.RouterLinks[r2.ID()]
-	newWeight := biLink.NetworkBILink.Left.GetProps().Weight
+	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 
 	for mac, weight := range r1.Weights {
 
@@ -657,7 +657,7 @@ func (app *Follower) RemoveNode(nodeId string) error {
 	}
 
 	if link != nil {
-		app.gcLinkShaper(link.NetworkBILink)
+		app.gcLinkShaper(link)
 	}
 
 	if n.MachineId == app.GetMachineId() {
@@ -721,7 +721,7 @@ func (app *Follower) RemoveBridge(bridgeId string) error {
 	}
 
 	if link != nil {
-		app.gcLinkShaper(link.NetworkBILink)
+		app.gcLinkShaper(link)
 	}
 	return nil
 }
@@ -737,8 +737,14 @@ func (app *Follower) RemoveRouter(routerId string) error {
 		graphDB.RemoveRouter(routerId)
 	}
 
+	for _, router := range r.ConnectedRouters {
+		if router.MachineId != app.GetMachineId() {
+			app.icm.RemoveConnection(router.ID(), r.ID())
+		}
+	}
+
 	for _, link := range r.RouterLinks {
-		app.gcLinkShaper(link.NetworkBILink)
+		app.gcLinkShaper(link)
 	}
 
 	_, err := app.topo.RemoveRouter(routerId)
@@ -768,7 +774,7 @@ func (app *Follower) DisconnectNode(id string) error {
 				return err
 			}
 			if link != nil {
-				app.gcLinkShaper(link.NetworkBILink)
+				app.gcLinkShaper(link)
 			}
 
 			return nil
@@ -799,7 +805,7 @@ func (app *Follower) DisconnectBridge(id string) error {
 			return err
 		}
 		if link != nil {
-			app.gcLinkShaper(link.NetworkBILink)
+			app.gcLinkShaper(link)
 		}
 
 		return nil
@@ -828,7 +834,11 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 			return err
 		}
 		if link != nil {
-			app.gcLinkShaper(link.NetworkBILink)
+			app.gcLinkShaper(link)
+		}
+
+		if r2.MachineId != app.GetMachineId() {
+			app.icm.RemoveConnection(r2.ID(), r1.ID())
 		}
 		return nil
 	} else {
@@ -840,8 +850,9 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 				return err
 			}
 			if link != nil {
-				app.gcLinkShaper(link.NetworkBILink)
+				app.gcLinkShaper(link)
 			}
+			app.icm.RemoveConnection(r1.ID(), r2.ID())
 			return nil
 		} else {
 			fmt.Println("tried to disconnect two remote routers in a follower")

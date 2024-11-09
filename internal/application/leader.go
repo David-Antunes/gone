@@ -130,34 +130,34 @@ func (app *Leader) clearInterceptLink(id string) error {
 }
 
 // Garbage collects shapers
-func (app *Leader) gcLinkShaper(link *network.BiLink) error {
+func (app *Leader) gcLinkShaper(link *topology.BiLink) error {
 
-	if link.Left != nil {
+	if link.ConnectsTo != nil {
 
-		link.Left.Close()
-		if s, ok := link.Left.GetShaper().(*network.SniffShaper); ok {
+		link.ConnectsTo.NetworkLink.Close()
+		if s, ok := link.ConnectsTo.NetworkLink.GetShaper().(*network.SniffShaper); ok {
 			_ = app.redirectManager.RemoveSniffer(s.GetRtID())
 		}
 
-		if s, ok := link.Left.GetShaper().(*network.InterceptShaper); ok {
+		if s, ok := link.ConnectsTo.NetworkLink.GetShaper().(*network.InterceptShaper); ok {
 			_ = app.redirectManager.RemoveIntercept(s.GetRtID())
 		}
-		if s, ok := link.Left.GetShaper().(*network.RemoteShaper); ok {
+		if s, ok := link.ConnectsTo.NetworkLink.GetShaper().(*network.RemoteShaper); ok {
 			app.icm.RemoveConnection(s.To, s.From)
 		}
 	}
 
-	if link.Right != nil {
-		link.Right.Close()
-		if s, ok := link.Right.GetShaper().(*network.SniffShaper); ok {
+	if link.ConnectsFrom != nil {
+		link.ConnectsFrom.NetworkLink.Close()
+		if s, ok := link.ConnectsFrom.NetworkLink.GetShaper().(*network.SniffShaper); ok {
 			_ = app.redirectManager.RemoveSniffer(s.GetRtID())
 		}
 
-		if s, ok := link.Right.GetShaper().(*network.InterceptShaper); ok {
+		if s, ok := link.ConnectsFrom.NetworkLink.GetShaper().(*network.InterceptShaper); ok {
 			_ = app.redirectManager.RemoveIntercept(s.GetRtID())
 		}
 
-		if s, ok := link.Right.GetShaper().(*network.RemoteShaper); ok {
+		if s, ok := link.ConnectsFrom.NetworkLink.GetShaper().(*network.RemoteShaper); ok {
 			app.icm.RemoveConnection(s.To, s.From)
 		}
 	}
@@ -584,7 +584,7 @@ func (app *Leader) PropagateNewRoutes(r *topology.Router) {
 func (app *Leader) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 
 	biLink := r1.RouterLinks[r2.ID()]
-	newWeight := biLink.NetworkBILink.Left.GetProps().Weight
+	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 
 	for mac, weight := range r1.Weights {
 
@@ -710,7 +710,7 @@ func (app *Leader) RemoveNode(nodeId string) error {
 		return err
 	}
 	if link != nil {
-		app.gcLinkShaper(link.NetworkBILink)
+		app.gcLinkShaper(link)
 	}
 
 	if n.MachineId == app.GetMachineId() {
@@ -809,7 +809,7 @@ func (app *Leader) RemoveBridge(bridgeId string) error {
 	}
 
 	if link != nil {
-		app.gcLinkShaper(link.NetworkBILink)
+		app.gcLinkShaper(link)
 	}
 
 	if b.MachineId != app.GetMachineId() {
@@ -875,11 +875,12 @@ func (app *Leader) RemoveRouter(routerId string) error {
 			if req.Error.ErrCode != 0 {
 				return errors.New(req.Error.ErrMsg)
 			}
+			app.icm.RemoveConnection(router.ID(), r.ID())
 		}
 	}
 
 	for _, link := range r.RouterLinks {
-		app.gcLinkShaper(link.NetworkBILink)
+		app.gcLinkShaper(link)
 	}
 
 	_, err := app.topo.RemoveRouter(routerId)
@@ -933,7 +934,7 @@ func (app *Leader) DisconnectNode(id string) error {
 				return err
 			}
 			if link != nil {
-				app.gcLinkShaper(link.NetworkBILink)
+				app.gcLinkShaper(link)
 			}
 			return nil
 		} else {
@@ -981,7 +982,7 @@ func (app *Leader) DisconnectBridge(id string) error {
 			return err
 		}
 		if link != nil {
-			app.gcLinkShaper(link.NetworkBILink)
+			app.gcLinkShaper(link)
 		}
 		return nil
 	}
@@ -1029,9 +1030,10 @@ func (app *Leader) DisconnectRouters(router1 string, router2 string) error {
 			return err
 		}
 		if link != nil {
-			app.gcLinkShaper(link.NetworkBILink)
+			app.gcLinkShaper(link)
 		}
 		if r2.MachineId != app.GetMachineId() {
+			app.icm.RemoveConnection(r2.ID(), r1.ID())
 			body := &disconnectApi.DisconnectRoutersRequest{
 				First:  router2,
 				Second: router1,
@@ -1066,7 +1068,7 @@ func (app *Leader) DisconnectRouters(router1 string, router2 string) error {
 				return err
 			}
 			if link != nil {
-				app.gcLinkShaper(link.NetworkBILink)
+				app.gcLinkShaper(link)
 			}
 			body := &disconnectApi.DisconnectRoutersRequest{
 				First:  router1,
@@ -1088,7 +1090,7 @@ func (app *Leader) DisconnectRouters(router1 string, router2 string) error {
 			if req.Error.ErrCode != 0 {
 				return errors.New(req.Error.ErrMsg)
 			}
-
+			app.icm.RemoveConnection(r1.ID(), r2.ID())
 			return nil
 		} else {
 			body := &disconnectApi.DisconnectRoutersRequest{

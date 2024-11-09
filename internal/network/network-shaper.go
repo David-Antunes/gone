@@ -202,7 +202,7 @@ func (shaper *NetworkShaper) ConvertToSniffShaper(rt *redirect_traffic.SniffComp
 		shaper.Stop()
 	}
 	return &SniffShaper{
-		running:   false,
+		running:   shaper.running,
 		queue:     shaper.queue,
 		incoming:  shaper.incoming,
 		outgoing:  shaper.outgoing,
@@ -221,7 +221,7 @@ func (shaper *NetworkShaper) ConvertToInterceptShaper(rt *redirect_traffic.Inter
 		shaper.Stop()
 	}
 	return &InterceptShaper{
-		running:   false,
+		running:   shaper.running,
 		queue:     shaper.queue,
 		incoming:  shaper.incoming,
 		outgoing:  shaper.outgoing,

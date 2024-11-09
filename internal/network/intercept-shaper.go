@@ -188,7 +188,7 @@ func (shaper *InterceptShaper) ConvertToNetworkShaper() *NetworkShaper {
 		shaper.Stop()
 	}
 	return &NetworkShaper{
-		running:   false,
+		running:   shaper.running,
 		queue:     shaper.queue,
 		incoming:  shaper.incoming,
 		outgoing:  shaper.outgoing,

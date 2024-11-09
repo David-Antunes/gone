@@ -510,7 +510,8 @@ func (topo *Topology) DisconnectNode(id string) error {
 
 	if b.Router != nil {
 		b.Router.NetworkRouter.RemoveNode([]byte(n.NetworkNode.GetMac()))
-		delete(b.Router.Weights, n.NetworkNode.GetMac())
+		//delete(b.Router.Weights, n.NetworkNode.GetMac())
+		b.Router.RemoveWeight(n.NetworkNode.GetMac())
 	}
 	return nil
 }
@@ -536,7 +537,7 @@ func (topo *Topology) DisconnectBridge(id string) error {
 
 	for _, node := range b.ConnectedNodes {
 		r.NetworkRouter.RemoveNode([]byte(node.NetworkNode.GetMac()))
-		delete(b.Router.Weights, node.NetworkNode.GetMac())
+		r.RemoveWeight(node.NetworkNode.GetMac())
 	}
 
 	return nil

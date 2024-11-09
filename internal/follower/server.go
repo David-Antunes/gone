@@ -57,6 +57,9 @@ func createDaemon(app *application.Follower, cd *cluster.ClusterDaemon, ipAddr s
 	m.HandleFunc("/trade", trade)
 	m.HandleFunc("/connectRouterToRouterRemote", connectRouterToRouterRemote)
 
+	m.HandleFunc("/forget", forget)
+	m.HandleFunc("/propagate", propagate)
+
 	m.HandleFunc("/sniffNode", sniffNode)
 	m.HandleFunc("/sniffBridge", sniffBridge)
 	m.HandleFunc("/sniffRouters", sniffRouters)

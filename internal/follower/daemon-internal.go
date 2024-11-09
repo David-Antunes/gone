@@ -84,6 +84,78 @@ func clearNode(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func propagate(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.PropagateRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("propagate:", err)
+		daemon.SendError(w, &opApi.PropagateResponse{
+			Name: req.Name,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.Propagate(req.Name)
+
+	if err != nil {
+		daemonLog.Println("propagate:", err)
+		daemon.SendError(w, &opApi.PropagateResponse{
+			Name: req.Name,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+
+	}
+	daemon.SendResponse(w, &opApi.PropagateResponse{
+		Name:  req.Name,
+		Error: apiErrors.Error{},
+	})
+}
+
+func forget(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.ForgetRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("forget:", err)
+		daemon.SendError(w, &opApi.ForgetResponse{
+			Name: req.Name,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.Forget(req.Name)
+
+	if err != nil {
+		daemonLog.Println("forget:", err)
+		daemon.SendError(w, &opApi.ForgetResponse{
+			Name: req.Name,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.ForgetResponse{
+		Name:  req.Name,
+		Error: apiErrors.Error{},
+	})
+
+}
+
 func trade(w http.ResponseWriter, r *http.Request) {
 
 	req := &api.TradeRoutesRequest{}
