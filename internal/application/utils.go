@@ -76,11 +76,11 @@ func convertToAPIBridge(b *topology.Bridge) api.Bridge {
 			To:   b.Router.Id,
 			From: b.ID(),
 			LinkProps: api.LinkProps{
-				Latency:   int(b.RouterLink.NetworkBILink.Left.GetProps().Latency),
-				Bandwidth: b.RouterLink.NetworkBILink.Left.GetProps().Bandwidth,
-				Jitter:    b.RouterLink.NetworkBILink.Left.GetProps().Jitter,
-				DropRate:  b.RouterLink.NetworkBILink.Left.GetProps().DropRate,
-				Weight:    b.RouterLink.NetworkBILink.Left.GetProps().Weight,
+				Latency:   int(b.RouterLink.ConnectsTo.NetworkLink.GetProps().Latency),
+				Bandwidth: b.RouterLink.ConnectsTo.NetworkLink.GetProps().Bandwidth,
+				Jitter:    b.RouterLink.ConnectsTo.NetworkLink.GetProps().Jitter,
+				DropRate:  b.RouterLink.ConnectsTo.NetworkLink.GetProps().DropRate,
+				Weight:    b.RouterLink.ConnectsTo.NetworkLink.GetProps().Weight,
 			},
 		}
 	}
@@ -93,6 +93,7 @@ func convertToAPIBridge(b *topology.Bridge) api.Bridge {
 	}
 }
 
+// Utilize ConnectsTo because of remote links having connectFrom nil
 func convertToAPIRouter(r *topology.Router) api.Router {
 	links := make(map[string]api.Link)
 
@@ -101,11 +102,11 @@ func convertToAPIRouter(r *topology.Router) api.Router {
 			To:   r.RouterLinks[k].To.ID(),
 			From: r.RouterLinks[k].From.ID(),
 			LinkProps: api.LinkProps{
-				Latency:   int(r.RouterLinks[k].NetworkBILink.Left.GetProps().Latency),
-				Bandwidth: r.RouterLinks[k].NetworkBILink.Left.GetProps().Bandwidth,
-				Jitter:    r.RouterLinks[k].NetworkBILink.Left.GetProps().Jitter,
-				DropRate:  r.RouterLinks[k].NetworkBILink.Left.GetProps().DropRate,
-				Weight:    r.RouterLinks[k].NetworkBILink.Left.GetProps().Weight,
+				Latency:   int(r.RouterLinks[k].ConnectsTo.NetworkLink.GetProps().Latency),
+				Bandwidth: r.RouterLinks[k].ConnectsTo.NetworkLink.GetProps().Bandwidth,
+				Jitter:    r.RouterLinks[k].ConnectsTo.NetworkLink.GetProps().Jitter,
+				DropRate:  r.RouterLinks[k].ConnectsTo.NetworkLink.GetProps().DropRate,
+				Weight:    r.RouterLinks[k].ConnectsTo.NetworkLink.GetProps().Weight,
 			},
 		}
 	}
