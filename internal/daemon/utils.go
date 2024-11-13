@@ -60,7 +60,7 @@ func ParseLinkProps(latency int, bandwidth int, jitter float64, dropRate float64
 
 	return network.LinkProps{
 		Latency:   time.Duration(latency*int(time.Millisecond)) / 2,
-		Bandwidth: bandwidth * 1000,
+		Bandwidth: bandwidth,
 		Jitter:    jitter / 2,
 		DropRate:  dropRate / 2,
 		Weight:    weight,
@@ -82,7 +82,7 @@ func ParseLinkPropsInternal(latency time.Duration, bandwidth int, jitter float64
 
 	return network.LinkProps{
 		Latency:   latency * time.Millisecond / 2,
-		Bandwidth: bandwidth * 1000,
+		Bandwidth: bandwidth,
 		Jitter:    jitter / 2,
 		DropRate:  dropRate / 2,
 		Weight:    weight,
