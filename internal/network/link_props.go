@@ -7,6 +7,7 @@ import (
 
 type LinkProps struct {
 	Latency   time.Duration
+	FLatency  float64
 	Bandwidth int
 	Jitter    float64
 	DropRate  float64
@@ -19,7 +20,6 @@ func (props *LinkProps) PollJitter() time.Duration {
 	} else {
 		return time.Duration((rand.NormFloat64() * props.Jitter) / 3 * float64(time.Millisecond))
 	}
-	//return time.Duration(float64(time.Millisecond) * rand.Float64() * props.Jitter)
 }
 func (props *LinkProps) PollDropRate() bool {
 	return rand.Float64() < props.DropRate

@@ -21,7 +21,6 @@ import (
 	"github.com/David-Antunes/gone/internal/topology"
 	"net"
 	"net/http"
-	"time"
 )
 
 type Leader struct {
@@ -172,7 +171,6 @@ func (app *Leader) HandleNewMac(frame *xdp.Frame, routerId string) {
 	r, _ := app.topo.GetRouter(routerId)
 
 	path, distance := graphDB.FindPathToRouter(routerId, dest)
-	fmt.Println(routerId, ":", net.HardwareAddr(dest), ":", path)
 
 	if len(path) > 0 {
 		if net.HardwareAddr(dest).String() == path[len(path)-1] {
@@ -342,10 +340,10 @@ func (app *Leader) ConnectNodeToBridge(nodeID string, bridgeID string, linkProps
 		body := &connectApi.ConnectNodeToBridgeRequest{
 			Node:      nodeID,
 			Bridge:    bridgeID,
-			Latency:   int(linkProps.Latency/time.Millisecond) * 2,
+			Latency:   linkProps.FLatency,
 			Jitter:    linkProps.Jitter,
 			DropRate:  linkProps.DropRate,
-			Bandwidth: linkProps.Bandwidth,
+			Bandwidth: linkProps.Bandwidth * 8,
 			Weight:    linkProps.Weight,
 		}
 
@@ -396,14 +394,13 @@ func (app *Leader) ConnectBridgeToRouter(bridgeID string, routerID string, linkP
 			fmt.Println("Added", netNode.ID(), "to router", routerID)
 		}
 	} else {
-
 		body := &connectApi.ConnectBridgeToRouterRequest{
 			Bridge:    bridgeID,
 			Router:    routerID,
-			Latency:   int(linkProps.Latency/time.Millisecond) * 2,
+			Latency:   linkProps.FLatency,
 			Jitter:    linkProps.Jitter,
 			DropRate:  linkProps.DropRate,
-			Bandwidth: linkProps.Bandwidth,
+			Bandwidth: linkProps.Bandwidth * 8,
 			Weight:    linkProps.Weight,
 		}
 
@@ -502,10 +499,10 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 		R1:        r2.ID(),
 		R2:        r1.ID(),
 		MachineID: r1.MachineId,
-		Latency:   linkProps.Latency * 2,
+		Latency:   linkProps.Latency * 2.0,
 		Jitter:    linkProps.Jitter,
 		DropRate:  linkProps.DropRate,
-		Bandwidth: linkProps.Bandwidth,
+		Bandwidth: linkProps.Bandwidth * 8,
 		Weight:    linkProps.Weight,
 	}
 	_, err := app.cl.SendMsg(r2.MachineId, b, "connectRouterToRouterRemote")
@@ -524,10 +521,10 @@ func (app *Leader) RedirectConnection(r1 *topology.Router, r2 *topology.Router, 
 		R1:        r1.ID(),
 		R2:        r2.ID(),
 		MachineID: r2.MachineId,
-		Latency:   linkProps.Latency * 2,
+		Latency:   linkProps.Latency * 2.0,
 		Jitter:    linkProps.Jitter,
 		DropRate:  linkProps.DropRate,
-		Bandwidth: linkProps.Bandwidth,
+		Bandwidth: linkProps.Bandwidth * 8,
 		Weight:    linkProps.Weight,
 	}
 	resp, err := app.cl.SendMsg(r1.MachineId, b, "connectRouterToRouter")

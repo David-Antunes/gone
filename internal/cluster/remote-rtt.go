@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/David-Antunes/gone/internal/network"
-	"log"
 	"math"
 	"net/http"
 	"time"
@@ -67,8 +66,8 @@ func (rtt *RemoteRTTManager) AddNode(id string, ip string) {
 				d = time.Duration(math.Min(float64(obs), float64(d)))
 			}
 
-			delay.Value = d / 2
-			fmt.Println("RTT INFO REMOTE:", log.Ltime, "Delay of", delay.Value, ip)
+			delay.Value = d / 2.0
+			fmt.Println("RTT INFO REMOTE: Delay of", delay.Value, ip)
 
 			if rtt.timeout > 0 {
 				time.Sleep(rtt.timeout)

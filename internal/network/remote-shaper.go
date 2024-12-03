@@ -43,6 +43,7 @@ func (shaper *RemoteShaper) GetDelay() *Delay {
 func CreateRemoteShaper(to string, from string, incoming chan *xdp.Frame, outgoing chan *RouterFrame, props LinkProps) Shaper {
 	aux := float64(packetSize / props.Bandwidth)
 	newTime := float64(time.Second) * aux
+
 	return &RemoteShaper{
 		running:   false,
 		queue:     make(chan *xdp.Frame, queueSize),

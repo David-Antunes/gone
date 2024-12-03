@@ -423,10 +423,10 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 		R1:        r2.ID(),
 		R2:        r1.ID(),
 		MachineID: r1.MachineId,
-		Latency:   linkProps.Latency * 2,
+		Latency:   linkProps.Latency * 2.0,
 		Jitter:    linkProps.Jitter,
 		DropRate:  linkProps.DropRate,
-		Bandwidth: linkProps.Bandwidth,
+		Bandwidth: linkProps.Bandwidth * 8,
 		Weight:    linkProps.Weight,
 	}
 	_, err := app.cl.SendMsg(r2.MachineId, b, "connectRouterToRouterRemote")
@@ -465,6 +465,7 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 	conn := app.cl.Endpoints[machineId]
 	d, _ := app.cl.GetNodeDelay(r2.MachineId)
 	app.icm.AddConnection(r2.ID(), d, conn, r1.ID(), r1.NetworkRouter)
+
 	toLink := network.CreateLink(router1Channel, nil, linkProps)
 	topoLink := &topology.Link{
 		Id:          r1.ID() + "-RemoteLink-" + r2.ID(),
