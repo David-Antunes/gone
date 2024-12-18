@@ -275,11 +275,11 @@ func sniffBridge(w http.ResponseWriter, r *http.Request) {
 	}
 	daemon.SendResponse(w, &opApi.SniffBridgeResponse{
 		Id:        id,
+		Bridge:    req.Bridge,
 		Path:      path,
 		MachineId: machineId,
 		Error:     apiErrors.Error{},
 	})
-
 }
 
 func sniffRouters(w http.ResponseWriter, r *http.Request) {

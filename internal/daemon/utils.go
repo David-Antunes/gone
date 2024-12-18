@@ -47,9 +47,9 @@ func SendError(w http.ResponseWriter, apiRequestStruct any) {
 
 func ParseLinkProps(latency float64, bandwidth int, jitter float64, dropRate float64, weight int) (network.LinkProps, error) {
 	if latency < 0 {
-		return network.LinkProps{}, errors.New("latency can't be lower than 10 ms")
-	} else if bandwidth < 10 {
-		return network.LinkProps{}, errors.New("bandwidth can't be lower than 10 kbps")
+		return network.LinkProps{}, errors.New("latency can't be lower than 0 ms")
+	} else if bandwidth < 12000 {
+		return network.LinkProps{}, errors.New("bandwidth can't be lower than 1.5 kbps")
 	} else if jitter < 0 {
 		return network.LinkProps{}, errors.New("jitter can't be lower than 0")
 	} else if dropRate < 0 || dropRate > 1 {
@@ -65,14 +65,13 @@ func ParseLinkProps(latency float64, bandwidth int, jitter float64, dropRate flo
 		DropRate:  dropRate,
 		Weight:    weight,
 	}, nil
-
 }
 
 func ParseLinkPropsInternal(latency time.Duration, bandwidth int, jitter float64, dropRate float64, weight int) (network.LinkProps, error) {
 	if latency < time.Millisecond*0 {
-		return network.LinkProps{}, errors.New("latency can't be lower than 10 ms")
+		return network.LinkProps{}, errors.New("latency can't be lower than 0 ms")
 	} else if bandwidth < 10 {
-		return network.LinkProps{}, errors.New("bandwidth can't be lower than 10 kbps")
+		return network.LinkProps{}, errors.New("bandwidth can't be lower than 1.5 kbps")
 	} else if jitter < 0 {
 		return network.LinkProps{}, errors.New("jitter can't be lower than 0")
 	} else if dropRate < 0 || dropRate > 1 {
