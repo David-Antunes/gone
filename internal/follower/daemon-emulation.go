@@ -206,7 +206,7 @@ func connectNodeToBridge(w http.ResponseWriter, r *http.Request) {
 		Error:  apiErrors.Error{},
 	})
 
-	daemonLog.Println("connectNodeToBridge:", "Connected", req.Node, "to", req.Bridge)
+	daemonLog.Println("connectNodeToBridge:", "Connected", req.Node, "to", req.Bridge, "Properties:", linkProps)
 }
 
 func connectBridgeToRouter(w http.ResponseWriter, r *http.Request) {
@@ -262,7 +262,7 @@ func connectBridgeToRouter(w http.ResponseWriter, r *http.Request) {
 		Router: req.Router,
 		Error:  apiErrors.Error{},
 	})
-	daemonLog.Println("connectBridgeToRouter:", "Connected", req.Bridge, "to", req.Router)
+	daemonLog.Println("connectBridgeToRouter:", "Connected", req.Bridge, "to", req.Router, "Properties:", linkProps)
 }
 
 func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
@@ -339,7 +339,7 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 		Error:     apiErrors.Error{},
 	})
 
-	daemonLog.Println("connectRouterToRouter:", "Connected", req.R1, "to", req.R2)
+	daemonLog.Println("connectRouterToRouter:", "Connected", req.R1, "to", req.R2, "Properties:", linkProps)
 }
 
 func connectRouterToRouterRemote(w http.ResponseWriter, r *http.Request) {

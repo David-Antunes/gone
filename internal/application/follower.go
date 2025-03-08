@@ -347,6 +347,10 @@ func (app *Follower) ConnectBridgeToRouter(bridgeID string, routerID string, lin
 
 func (app *Follower) ConnectRouterToRouterLocally(router1ID string, router2ID string, linkProps network.LinkProps) error {
 
+	if router1ID == router2ID {
+		return errors.New("can't connect a router to itself")
+	}
+
 	r1, ok := app.topo.GetRouter(router1ID)
 
 	if !ok {
@@ -369,6 +373,10 @@ func (app *Follower) ConnectRouterToRouterLocally(router1ID string, router2ID st
 }
 
 func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID string, machineId string, linkProps network.LinkProps) error {
+
+	if router1ID == router2ID {
+		return errors.New("can't connect a router to itself")
+	}
 
 	r1, ok := app.topo.GetRouter(router1ID)
 
