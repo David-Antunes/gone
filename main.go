@@ -42,6 +42,7 @@ func cleanup() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
+		//pprof.StopCPUProfile()
 		os.Exit(0)
 	}()
 }
@@ -101,6 +102,12 @@ func main() {
 	if err != nil {
 		emulationLog.Println(err)
 	}
+
+	//f, err := os.Create("profiler.prof")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//pprof.StartCPUProfile(f)
 
 	rttSocket, err := net.Dial("unix", viper.GetString("PROXY_RTT_SOCKET"))
 	if err != nil {

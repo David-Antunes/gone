@@ -143,8 +143,8 @@ func (shaper *InterceptShaper) receive() {
 			}
 			if len(shaper.queue) < queueSize {
 				shaper.queue <- frame
-			} else {
-				fmt.Println("Queue Full!")
+				//} else {
+				//	fmt.Println("Queue Full!")
 			}
 		}
 	}
@@ -170,14 +170,14 @@ func (shaper *InterceptShaper) send() {
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize
 			}
 
-			go func() {
-				time.Sleep(time.Until(frame.Time))
-				if len(shaper.outgoing) < queueSize {
-					shaper.outgoing <- frame
-				} else {
-					fmt.Println("Queue Full!")
-				}
-			}()
+			//go func() {
+			time.Sleep(time.Until(frame.Time))
+			if len(shaper.outgoing) < queueSize {
+				shaper.outgoing <- frame
+				//} else {
+				//	fmt.Println("Queue Full!")
+			}
+			//}()
 
 		}
 	}

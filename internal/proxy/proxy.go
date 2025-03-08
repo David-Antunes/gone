@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"encoding/gob"
-	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"log"
 	"net"
@@ -77,8 +76,8 @@ func receive(mac string, dec *gob.Decoder, incoming chan *xdp.Frame) {
 		if len(incoming) < queueSize {
 			//frame.Time = frame.Time.Add(-time.Now().Sub(frame.Time))
 			incoming <- frame
-		} else {
-			fmt.Println("Proxy queue full")
+			//} else {
+			//	fmt.Println("Proxy queue full")
 		}
 	}
 }

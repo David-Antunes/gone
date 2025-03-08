@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"github.com/David-Antunes/gone/internal/network/routing"
 	"sync"
@@ -100,8 +99,8 @@ func (router *Router) receive() {
 		case frame := <-router.incomingChannel:
 			if len(router.queue) < queueSize {
 				router.queue <- frame
-			} else {
-				fmt.Println(router.id, "Queue Full!")
+				//} else {
+				//	fmt.Println(router.id, "Queue Full!")
 			}
 		}
 	}

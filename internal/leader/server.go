@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"runtime/pprof"
 )
 
 type server struct {
@@ -87,6 +88,7 @@ func createDaemon(app *application.Leader, cd *cluster.ClusterDaemon, ipAddr str
 	m.HandleFunc("/unpause", unpause)
 
 	m.HandleFunc("/registerMachine", cd.RegisterMachine)
+	m.HandleFunc("/shutdown", shutdown)
 
 	httpServer := http.Server{
 		Handler: m,
@@ -107,5 +109,9 @@ func Serve() {
 }
 
 func ping(w http.ResponseWriter, r *http.Request) {
+	return
+}
+func shutdown(w http.ResponseWriter, r *http.Request) {
+	pprof.StopCPUProfile()
 	return
 }

@@ -2,7 +2,6 @@ package network
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"sync"
 	"time"
@@ -107,8 +106,8 @@ func (bridge *Bridge) receive() {
 		case frame := <-bridge.incomingChannel:
 			if len(bridge.queue) < queueSize {
 				bridge.queue <- frame
-			} else {
-				fmt.Println("Queue Full!")
+				//} else {
+				//	fmt.Println("Queue Full!")
 			}
 		}
 	}

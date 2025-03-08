@@ -2,7 +2,7 @@ package network
 
 import "github.com/David-Antunes/gone-proxy/xdp"
 
-const queueSize = 10000000
+const queueSize = 3000
 const packetSize = 1500
 
 var nullChan = make(chan *xdp.Frame, queueSize)
