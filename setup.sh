@@ -16,27 +16,16 @@ docker kill neo
 
 docker system prune -f
 
-
 docker run -d --name neo -p 7474:7474 -p 7687:7687 -e NEO4J_apoc_export_file_enabled=true -e NEO4J_apoc_import_file_enabled=true -e NEO4J_apoc_import_file_use__neo4j__config=true -e  NEO4J_PLUGINS=\[\"apoc\"\] -e NEO4J_AUTH=none neo4j
 
 docker network create --driver=overlay --attachable --subnet=10.1.0.0/24 gone_net
 
-cd gone-rtt
 
-docker build -t gone-rtt .
-cd ..
+docker build -t gone-rtt gone-rtt/
 
-cd gone-proxy
+docker build -t gone-proxy gone-proxy/
 
-docker build -t gone-proxy .
-
-cd ..
-
-cd gone-agent
-
-docker build -t gone-agent .
-
-cd ..
+docker build -t gone-agent gone-agent/
 
 docker build -t gone .
 
