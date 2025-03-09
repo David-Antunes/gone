@@ -118,6 +118,8 @@ if [[ ! $LOCAL_IP =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   exit 1
 fi
 
+docker system prune -f
+
 # Clear previous execution
 docker unpause $(docker ps -q --filter "network=gone_net")
 docker kill $(docker ps -q --filter "network=gone_net")
