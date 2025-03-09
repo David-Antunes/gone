@@ -29,13 +29,13 @@ Next, you need to start Docker Swarm.
 docker swarm init
 ```
 
-And create the default network used GONE to configure the emulation:
+And create the default network used by GONE to configure the emulation:
 
 ```bash
 docker network create --driver=overlay --attachable --subnet=10.1.0.0/24 gone_net
 ```
 
-The user can change the subnet to allow more containers in the network.
+You can change the subnet to allow more containers in the network.
 
 To build the necessary images you need to execute the following:
 

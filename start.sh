@@ -118,7 +118,9 @@ if [[ ! $LOCAL_IP =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   exit 1
 fi
 
-docker system prune -f
+#docker system prune -f
+
+#docker network create --driver=overlay --attachable --subnet=10.1.0.0/24 gone_net
 
 # Clear previous execution
 docker unpause $(docker ps -q --filter "network=gone_net")
