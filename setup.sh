@@ -7,15 +7,15 @@ function ctrl_c() {
   exit 1
 }
 
-docker unpause $(docker ps -q --filter "network=gone_net")
-docker kill $(docker ps -q --filter "network=gone_net")
-docker kill rtt-$(hostname)
-docker kill gone-$(hostname)
-docker kill proxy-$(hostname)
-docker kill agent-$(hostname)
-docker kill neo
+#docker unpause $(docker ps -q --filter "network=gone_net")
+#docker kill $(docker ps -q --filter "network=gone_net")
+#docker kill rtt-$(hostname)
+#docker kill gone-$(hostname)
+#docker kill proxy-$(hostname)
+#docker kill agent-$(hostname)
+#docker kill neo
 
-docker system prune -f
+#docker system prune -f
 
 docker run -d --name neo -p 7474:7474 -p 7687:7687 -e NEO4J_apoc_export_file_enabled=true -e NEO4J_apoc_import_file_enabled=true -e NEO4J_apoc_import_file_use__neo4j__config=true -e  NEO4J_PLUGINS=\[\"apoc\"\] -e NEO4J_AUTH=none neo4j
 
