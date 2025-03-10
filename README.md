@@ -53,13 +53,14 @@ To deploy the network emulator the user can utilize the `start.sh` script to dep
 ./start.sh
 ```
 ```
-Usage: ./start.sh -i <ifname> -N <name> (-P | -s <source_ip>) [-A] [-C]
-  -i <ifname>      : Required network interface name
-  -N <name>        : GONE instance ID
-  -P               : Start GONE as Leader (mutually exclusive with -s)
-  -s <source_ip>   : Leader IP address (mutually exclusive with -P)
-  -A               : Starts GONE-Agent (optional)
-  -C               : Clears all containers (Ignores all other flags)
+Usage: ./start.sh -i <ifname> -N <name> -n <network-name> (-P | -s <source_ip>) [-A] [-C]
+  -i <ifname>       : Required network interface name
+  -N <name>         : GONE instance ID
+  -n <network-name> : Docker network created
+  -P                : Start GONE as Leader (mutually exclusive with -s)
+  -s <source_ip>    : Leader IP address (mutually exclusive with -P)
+  -A                : Starts GONE-Agent (optional)
+  -C                : Clears all containers (Ignores all other flags)
 ```
 
 This script requires the user to provide a name of the network interface connected to the internet. Typically this interface is called eth0 or eno1.
@@ -67,7 +68,7 @@ This script requires the user to provide a name of the network interface connect
 To deploy locally the user can use the following flags:
 
 ```bash
-./start.sh -i eth0 -N $(hostname) -P
+./start.sh -i eth0 -N $(hostname) -P -n gone_net
 ```
 This will start GONE-RTT, GONE-Proxy, and GONE as a Leader. This will create a local network emulator that you can use.
 
@@ -101,7 +102,7 @@ Considering deploying in two machines, one leader and one follower, with the IP 
 In the leader machine you execute `start.sh` with the following values:
 
 ```bash
-./start.sh -i eth0 -N leader-1 -P -A
+./start.sh -i eth0 -N leader-1 -P -A -n gone_net
 ```
 In this scenario, we identified the leader instance with the id of "leader-1". This identifier is important since it is used to create network components in the desired instance.
 
@@ -111,7 +112,7 @@ In this command, we use the "-A" flag to also deploy GONE-Agent, to manage the G
 To add a follower to the network emulator, the follower machine must run the following command:
 
 ```bash
-./start.sh -i eth0 -N follower-1 -s 192.168.1.2 -A
+./start.sh -i eth0 -N follower-1 -s 192.168.1.2 -A -n gone_net
 ```
 
 In this scenario, the user must use the "-s" flag, providing the IP address of the leader so the follower can connect to the leader and participate in the emulation.
@@ -141,7 +142,7 @@ To configure a simple network containing a bridge and 2 nodes, a client and a se
 
 * To configure GONE:
 ```bash
-./start.sh -i eth0 -N $(hostname) -P
+./start.sh -i eth0 -N $(hostname) -P -n gone_net
 ```
 
 * To create the network topology:
@@ -167,12 +168,12 @@ gone-cli unpause client
 
 To stop the entire system you can execute:
 ```bash
-./start.sh -C
+./start.sh -C -n gone_net
 ```
 
 If you plan on deploying other networks you can restart by executing the previous command:
 ```bash
-./start.sh -i eth0 -N $(hostname) -P
+./start.sh -i eth0 -N $(hostname) -P -n gone_net
 ```
 
 
