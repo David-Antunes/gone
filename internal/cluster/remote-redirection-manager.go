@@ -98,7 +98,7 @@ func (icm *InterCommunicationManager) AddConnection(remoteRouter string, delay *
 func (icm *InterCommunicationManager) RemoveConnection(remoteRouter string, localRouter string) {
 	icm.Lock()
 	icmLog.Println("Removing connection to remote router", remoteRouter, "from local router", localRouter)
-	delete(icm.connections, remoteRouter)
+	delete(icm.remoteRouters, remoteRouter)
 	delete(icm.routers, localRouter)
 	delete(icm.delays, remoteRouter)
 	icm.Unlock()
