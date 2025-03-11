@@ -849,6 +849,13 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 		if r2.MachineId != app.GetMachineId() {
 			app.icm.RemoveConnection(r2.ID(), r1.ID())
 		}
+
+		if len(r2.ConnectedRouters) == 0 {
+			_, err = app.topo.RemoveRouter(r2.ID())
+			if err != nil {
+				return err
+			}
+		}
 		return nil
 	} else {
 		if r2.MachineId == app.GetMachineId() {
@@ -862,6 +869,13 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 				app.gcLinkShaper(link)
 			}
 			app.icm.RemoveConnection(r1.ID(), r2.ID())
+
+			if len(r2.ConnectedRouters) == 0 {
+				_, err = app.topo.RemoveRouter(r2.ID())
+				if err != nil {
+					return err
+				}
+			}
 			return nil
 		} else {
 			fmt.Println("tried to disconnect two remote routers in a follower")
