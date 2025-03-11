@@ -633,6 +633,7 @@ func (app *Leader) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router) e
 		return errors.New("couldn't decode weights response")
 	}
 
+	app.topo.Lock()
 	biLink := r1.RouterLinks[r2.ID()]
 	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 
@@ -648,6 +649,7 @@ func (app *Leader) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router) e
 			fmt.Println(r1.ID(), "added weight of", net.HardwareAddr(mac), "from", r2.ID(), "with weight", newWeight+weight.Weight)
 		}
 	}
+	app.topo.Unlock()
 
 	body := &internal.TradeRoutesRequest{
 		To:      r2.ID(),
@@ -676,7 +678,7 @@ func (app *Leader) ApplyRoutes(to string, from string, weights map[string]topolo
 	if !ok {
 		return
 	}
-
+	app.topo.Lock()
 	biLink := r.RouterLinks[from]
 	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 	for mac, weight := range weights {
@@ -691,6 +693,7 @@ func (app *Leader) ApplyRoutes(to string, from string, weights map[string]topolo
 			fmt.Println(r.ID(), "added weight of", net.HardwareAddr(mac), "from", from, "with weight", newWeight+weight.Weight)
 		}
 	}
+	app.topo.Unlock()
 
 }
 func (app *Leader) RemoveNode(nodeId string) error {

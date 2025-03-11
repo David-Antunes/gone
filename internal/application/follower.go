@@ -511,6 +511,7 @@ func (app *Follower) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 	biLink := r1.RouterLinks[r2.ID()]
 	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 
+	app.topo.Lock()
 	for mac, weight := range r1.Weights {
 
 		if existingWeight, ok := r2.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
@@ -536,6 +537,7 @@ func (app *Follower) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 			fmt.Println(r1.ID(), "added weight of", net.HardwareAddr(mac), "from", r2.ID(), "with weight", newWeight+weight.Weight)
 		}
 	}
+	app.topo.Unlock()
 }
 
 func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router) error {
@@ -554,7 +556,7 @@ func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router)
 	if err != nil {
 		return errors.New("couldn't decode weights response")
 	}
-
+	app.topo.Lock()
 	biLink := r1.RouterLinks[r2.ID()]
 
 	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
@@ -571,6 +573,7 @@ func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router)
 			fmt.Println(r1.ID(), "added weight of", net.HardwareAddr(mac), "from", r2.ID(), "with weight", newWeight+weight.Weight)
 		}
 	}
+	app.topo.Unlock()
 
 	body := &internal.TradeRoutesRequest{
 		To:      r2.ID(),
@@ -600,6 +603,7 @@ func (app *Follower) ApplyRoutes(to string, from string, weights map[string]topo
 		return
 	}
 
+	app.topo.Lock()
 	biLink := r.RouterLinks[from]
 	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 	for mac, weight := range weights {
@@ -614,6 +618,7 @@ func (app *Follower) ApplyRoutes(to string, from string, weights map[string]topo
 			fmt.Println(r.ID(), "added weight of", net.HardwareAddr(mac), "from", from, "with weight", newWeight+weight.Weight)
 		}
 	}
+	app.topo.Unlock()
 }
 
 func (app *Follower) PropagateNewRoutes(r *topology.Router) {
