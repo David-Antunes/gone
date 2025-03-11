@@ -870,8 +870,8 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 			}
 			app.icm.RemoveConnection(r1.ID(), r2.ID())
 
-			if len(r2.ConnectedRouters) == 0 {
-				_, err = app.topo.RemoveRouter(r2.ID())
+			if len(r1.ConnectedRouters) == 0 {
+				_, err = app.topo.RemoveRouter(r1.ID())
 				if err != nil {
 					return err
 				}
