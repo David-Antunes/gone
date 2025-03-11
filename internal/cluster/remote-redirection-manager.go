@@ -14,14 +14,15 @@ var icmLog = log.New(os.Stdout, "REMOTE INFO: ", log.Ltime)
 
 type InterCommunicationManager struct {
 	sync.Mutex
-	conn        net.Listener
-	connections map[string]*gob.Encoder
-	delays      map[string]*network.Delay
-	inQueue     chan *network.RouterFrame
-	outQueue    chan *network.RouterFrame
-	routers     map[string]*network.Router
-	ctx         chan struct{}
-	running     bool
+	conn          net.Listener
+	connections   map[string]*gob.Encoder
+	remoteRouters map[string]*gob.Encoder
+	delays        map[string]*network.Delay
+	inQueue       chan *network.RouterFrame
+	outQueue      chan *network.RouterFrame
+	routers       map[string]*network.Router
+	ctx           chan struct{}
+	running       bool
 }
 
 func (icm *InterCommunicationManager) GetoutQueue() chan *network.RouterFrame {
@@ -30,15 +31,16 @@ func (icm *InterCommunicationManager) GetoutQueue() chan *network.RouterFrame {
 
 func CreateInterCommunicationManager() *InterCommunicationManager {
 	return &InterCommunicationManager{
-		Mutex:       sync.Mutex{},
-		conn:        nil,
-		connections: make(map[string]*gob.Encoder),
-		delays:      make(map[string]*network.Delay),
-		inQueue:     make(chan *network.RouterFrame, queueSize),
-		outQueue:    make(chan *network.RouterFrame, queueSize),
-		routers:     make(map[string]*network.Router),
-		ctx:         make(chan struct{}),
-		running:     false,
+		Mutex:         sync.Mutex{},
+		conn:          nil,
+		connections:   make(map[string]*gob.Encoder),
+		remoteRouters: make(map[string]*gob.Encoder),
+		delays:        make(map[string]*network.Delay),
+		inQueue:       make(chan *network.RouterFrame, queueSize),
+		outQueue:      make(chan *network.RouterFrame, queueSize),
+		routers:       make(map[string]*network.Router),
+		ctx:           make(chan struct{}),
+		running:       false,
 	}
 }
 func (icm *InterCommunicationManager) SetConnection(conn net.Listener) {
@@ -76,10 +78,18 @@ func (icm *InterCommunicationManager) Stop() {
 	icm.ctx <- struct{}{}
 }
 
-func (icm *InterCommunicationManager) AddConnection(remoteRouter string, delay *network.Delay, connection net.Conn, localRouter string, router *network.Router) {
+func (icm *InterCommunicationManager) AddMachine(conn net.Conn, machineId string) {
+	icm.Lock()
+	defer icm.Unlock()
+	if _, ok := icm.connections[machineId]; !ok {
+		icm.connections[machineId] = gob.NewEncoder(conn)
+	}
+}
+
+func (icm *InterCommunicationManager) AddConnection(remoteRouter string, delay *network.Delay, machineId string, localRouter string, router *network.Router) {
 	icm.Lock()
 	icmLog.Println("Adding connection to remote router", remoteRouter, "with delay", delay.Value, "from local router", localRouter)
-	icm.connections[remoteRouter] = gob.NewEncoder(connection)
+	icm.remoteRouters[remoteRouter] = icm.connections[machineId]
 	icm.routers[localRouter] = router
 	icm.delays[remoteRouter] = delay
 	icm.Unlock()
@@ -136,7 +146,7 @@ func (icm *InterCommunicationManager) send() {
 			return
 		case frame := <-icm.outQueue:
 			icm.Lock()
-			conn, ok := icm.connections[frame.To]
+			conn, ok := icm.remoteRouters[frame.To]
 			if ok {
 				err := conn.Encode(&frame)
 				if err != nil {

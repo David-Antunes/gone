@@ -474,7 +474,9 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
 	conn := app.cl.Endpoints[r2.MachineId]
 	d, _ := app.cl.GetNodeDelay(r2.MachineId)
-	app.icm.AddConnection(r2.ID(), d, conn, r1.ID(), r1.NetworkRouter)
+	// Temporary Fix
+	app.icm.AddMachine(conn, r2.MachineId)
+	app.icm.AddConnection(r2.ID(), d, r2.MachineId, r1.ID(), r1.NetworkRouter)
 	toLink := network.CreateLink(router1Channel, nil, linkProps)
 	topoLink := &topology.Link{
 		Id:          r1.ID() + "-RemoteLink-" + r2.ID(),
