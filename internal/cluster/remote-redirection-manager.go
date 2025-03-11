@@ -14,15 +14,14 @@ var icmLog = log.New(os.Stdout, "REMOTE INFO: ", log.Ltime)
 
 type InterCommunicationManager struct {
 	sync.Mutex
-	conn         *net.UDPConn
-	connections  map[string]*net.UDPAddr
-	delays       map[string]*network.Delay
-	inQueue      chan *network.RouterFrame
-	outQueue     chan *network.RouterFrame
-	routers      map[string]*network.Router
-	ctx          chan struct{}
-	running      bool
-	connChannels map[string]chan *network.RouterFrame
+	conn        *net.UDPConn
+	connections map[string]*net.UDPAddr
+	delays      map[string]*network.Delay
+	inQueue     chan *network.RouterFrame
+	outQueue    chan *network.RouterFrame
+	routers     map[string]*network.Router
+	ctx         chan struct{}
+	running     bool
 }
 
 func (icm *InterCommunicationManager) GetoutQueue() chan *network.RouterFrame {
@@ -31,16 +30,15 @@ func (icm *InterCommunicationManager) GetoutQueue() chan *network.RouterFrame {
 
 func CreateInterCommunicationManager() *InterCommunicationManager {
 	return &InterCommunicationManager{
-		Mutex:        sync.Mutex{},
-		conn:         nil,
-		connections:  make(map[string]*net.UDPAddr),
-		delays:       make(map[string]*network.Delay),
-		inQueue:      make(chan *network.RouterFrame, queueSize),
-		outQueue:     make(chan *network.RouterFrame, queueSize),
-		routers:      make(map[string]*network.Router),
-		ctx:          make(chan struct{}),
-		connChannels: make(map[string]chan *network.RouterFrame),
-		running:      false,
+		Mutex:       sync.Mutex{},
+		conn:        nil,
+		connections: make(map[string]*net.UDPAddr),
+		delays:      make(map[string]*network.Delay),
+		inQueue:     make(chan *network.RouterFrame, queueSize),
+		outQueue:    make(chan *network.RouterFrame, queueSize),
+		routers:     make(map[string]*network.Router),
+		ctx:         make(chan struct{}),
+		running:     false,
 	}
 }
 func (icm *InterCommunicationManager) SetConnection(conn *net.UDPConn) {
@@ -57,7 +55,7 @@ func (icm *InterCommunicationManager) Start() {
 		//go icm.Accept()
 		go icm.receive()
 		go icm.receiveFrames()
-		go icm.distributeFrames()
+		go icm.send()
 	}
 }
 
@@ -73,9 +71,6 @@ func (icm *InterCommunicationManager) AddConnection(remoteRouter string, delay *
 	icm.connections[remoteRouter] = connection
 	icm.routers[localRouter] = router
 	icm.delays[remoteRouter] = delay
-	channel := make(chan *network.RouterFrame, queueSize)
-	icm.connChannels[remoteRouter] = channel
-	go send(channel, icm.conn, connection)
 	icm.Unlock()
 }
 
@@ -83,7 +78,6 @@ func (icm *InterCommunicationManager) RemoveConnection(remoteRouter string, loca
 	icm.Lock()
 	icmLog.Println("Removing connection to remote router", remoteRouter, "from local router", localRouter)
 	delete(icm.connections, remoteRouter)
-	delete(icm.connChannels, remoteRouter)
 	delete(icm.routers, localRouter)
 	delete(icm.delays, remoteRouter)
 	icm.Unlock()
@@ -131,33 +125,27 @@ func (icm *InterCommunicationManager) receive() {
 	}
 }
 
-func (icm *InterCommunicationManager) distributeFrames() {
+func (icm *InterCommunicationManager) send() {
+	var response bytes.Buffer
+	enc := gob.NewEncoder(&response)
 	for {
 		select {
 		case <-icm.ctx:
 			return
 		case frame := <-icm.outQueue:
-			icm.Lock()
-			icm.connChannels[frame.To] <- frame
-			icm.Unlock()
-		}
-	}
-}
-
-func send(channel chan *network.RouterFrame, conn *net.UDPConn, addr *net.UDPAddr) {
-	var response bytes.Buffer
-	enc := gob.NewEncoder(&response)
-	for {
-		select {
-		case frame := <-channel:
 			if enc.Encode(&frame) != nil {
 				log.Fatal("encode frame failed", frame)
 			} else {
-				_, err := conn.WriteToUDP(response.Bytes(), addr)
-				if err != nil {
-					panic(err)
+				icm.Lock()
+				if addr, ok := icm.connections[frame.To]; ok {
+					_, err := icm.conn.WriteToUDP(response.Bytes(), addr)
+					if err != nil {
+						panic(err)
+					}
 				}
+				icm.Unlock()
 			}
+
 		}
 	}
 }
