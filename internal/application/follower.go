@@ -400,7 +400,7 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 
 	r2, _ = app.topo.GetRouter(router2ID)
 
-	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
+	router1Channel := make(chan *xdp.Frame, QueueSize)
 	conn := app.cl.Endpoints[r2.MachineId]
 	d, _ := app.cl.GetNodeDelay(r2.MachineId)
 	app.icm.AddConnection(r2.ID(), d, conn, r1.ID(), r1.NetworkRouter)
@@ -469,7 +469,7 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 
 	r2, _ = app.topo.GetRouter(router2ID)
 
-	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
+	router1Channel := make(chan *xdp.Frame, QueueSize)
 	conn := app.cl.Endpoints[machineId]
 	d, _ := app.cl.GetNodeDelay(r2.MachineId)
 	app.icm.AddConnection(r2.ID(), d, conn, r1.ID(), r1.NetworkRouter)

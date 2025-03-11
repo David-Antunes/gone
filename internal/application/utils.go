@@ -7,7 +7,7 @@ import (
 	"net"
 )
 
-const _REMOTE_QUEUESIZE = 1000
+const QueueSize = 1000
 
 func sniffSocketPath(id string) string {
 	return "/tmp/" + id + ".sniff"

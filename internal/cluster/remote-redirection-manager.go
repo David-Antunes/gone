@@ -56,8 +56,8 @@ func (icm *InterCommunicationManager) Start() {
 		icm.running = true
 		//go icm.Accept()
 		go icm.receive()
-		go icm.distributeFrames()
 		go icm.receiveFrames()
+		go icm.distributeFrames()
 	}
 }
 
@@ -150,7 +150,7 @@ func send(channel chan *network.RouterFrame, conn *net.UDPConn, addr *net.UDPAdd
 	for {
 		select {
 		case frame := <-channel:
-			if enc.Encode(frame) != nil {
+			if enc.Encode(&frame) != nil {
 				log.Fatal("encode frame failed", frame)
 			} else {
 				_, err := conn.WriteToUDP(response.Bytes(), addr)

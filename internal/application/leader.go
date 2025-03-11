@@ -471,7 +471,7 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 		return errors.New(r1.ID() + " is already connected to " + r2.ID())
 	}
 
-	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
+	router1Channel := make(chan *xdp.Frame, QueueSize)
 	conn := app.cl.Endpoints[r2.MachineId]
 	d, _ := app.cl.GetNodeDelay(r2.MachineId)
 	app.icm.AddConnection(r2.ID(), d, conn, r1.ID(), r1.NetworkRouter)
