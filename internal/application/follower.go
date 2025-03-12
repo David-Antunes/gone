@@ -71,6 +71,8 @@ func (app *Follower) GetRouter(id string) (api.Router, bool) {
 }
 
 func (app *Follower) GetRouterWeights(id string) map[string]topology.Weight {
+	app.topo.Lock()
+	app.topo.Unlock()
 	r, _ := app.topo.GetRouter(id)
 	return r.Weights
 }
