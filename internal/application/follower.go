@@ -607,7 +607,7 @@ func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router)
 func (app *Follower) ApplyRoutes(to string, from string, weights map[string]topology.Weight) {
 	r, ok := app.topo.GetRouter(to)
 
-	if ok {
+	if !ok {
 		return
 	}
 
