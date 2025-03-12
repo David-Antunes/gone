@@ -74,6 +74,8 @@ func (app *Leader) GetRouter(id string) (api.Router, bool) {
 }
 
 func (app *Leader) GetRouterWeights(id string) map[string]topology.Weight {
+	app.topo.Lock()
+	defer app.topo.Unlock()
 	r, _ := app.topo.GetRouter(id)
 	return r.Weights
 }
@@ -171,6 +173,7 @@ func (app *Leader) HandleNewMac(frame *xdp.Frame, routerId string) {
 	r, _ := app.topo.GetRouter(routerId)
 
 	path, distance := graphDB.FindPathToRouter(routerId, dest)
+	fmt.Println(routerId, ":", net.HardwareAddr(dest), ":", path)
 
 	if len(path) > 0 {
 		if net.HardwareAddr(dest).String() == path[len(path)-1] {
