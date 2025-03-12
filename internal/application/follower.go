@@ -541,7 +541,6 @@ func (app *Follower) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 			fmt.Println(r1.ID(), "added weight of", net.HardwareAddr(mac), "from", r2.ID(), "with weight", newWeight+weight.Weight)
 		}
 	}
-	app.topo.Unlock()
 }
 
 func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router) error {
