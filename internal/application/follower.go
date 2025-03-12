@@ -73,8 +73,11 @@ func (app *Follower) GetRouter(id string) (api.Router, bool) {
 func (app *Follower) GetRouterWeights(id string) map[string]topology.Weight {
 	app.topo.Lock()
 	app.topo.Unlock()
-	r, _ := app.topo.GetRouter(id)
-	return r.Weights
+	r, ok := app.topo.GetRouter(id)
+	if ok {
+		return r.Weights
+	}
+	return map[string]topology.Weight{}
 }
 
 // Changes sniffShaper into network shaper
