@@ -88,7 +88,7 @@ func (icm *InterCommunicationManager) AddMachine(conn net.Conn, machineId string
 
 func (icm *InterCommunicationManager) AddConnection(remoteRouter string, delay *network.Delay, machineId string, localRouter string, router *network.Router) {
 	icm.Lock()
-	icmLog.Println("Adding connection to remote router", remoteRouter, "with delay", delay.Value, "from local router", localRouter)
+	icmLog.Println("Adding connection to remote router", remoteRouter, "with delay", delay.Value, "from local router", localRouter, "in machine", machineId)
 	icm.remoteRouters[remoteRouter] = icm.connections[machineId]
 	icm.routers[localRouter] = router
 	icm.delays[remoteRouter] = delay
@@ -116,6 +116,7 @@ func (icm *InterCommunicationManager) receiveFrames() {
 				//frame.Frame.Time = time.Now().Add(-icm.delays[frame.From].Value)
 				router.InjectFrame(frame.Frame)
 			} else {
+				fmt.Println("No router for ", frame.To)
 			}
 
 			//icm.Unlock()
@@ -132,7 +133,6 @@ func (icm *InterCommunicationManager) receive(conn net.Conn) {
 		if err != nil {
 			panic(err)
 		}
-
 		if len(icm.inQueue) < queueSize {
 			icm.inQueue <- frame
 		}
@@ -153,6 +153,7 @@ func (icm *InterCommunicationManager) send() {
 					panic(err)
 				}
 			} else {
+				fmt.Println("No router for ", frame.To)
 			}
 			icm.Unlock()
 		}

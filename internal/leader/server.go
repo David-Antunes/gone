@@ -44,15 +44,20 @@ func createDaemon(app *application.Leader, cd *cluster.ClusterDaemon, ipAddr str
 	m.HandleFunc("/connectNodeToBridge", connectNodeToBridge)
 	m.HandleFunc("/connectBridgeToRouter", connectBridgeToRouter)
 	m.HandleFunc("/connectRouterToRouter", connectRouterToRouter)
+	m.HandleFunc("/connectRouterToRouterRemote", connectRouterToRouterRemote)
+
 	m.HandleFunc("/inspectNode", inspectNode)
 	m.HandleFunc("/inspectBridge", inspectBridge)
 	m.HandleFunc("/inspectRouter", inspectRouter)
+
 	m.HandleFunc("/removeNode", removeNode)
 	m.HandleFunc("/removeBridge", removeBridge)
 	m.HandleFunc("/removeRouter", removeRouter)
+
 	m.HandleFunc("/disconnectNode", disconnectNode)
 	m.HandleFunc("/disconnectBridge", disconnectBridge)
 	m.HandleFunc("/disconnectRouters", disconnectRouters)
+	m.HandleFunc("/localDisconnect", localDisconnect)
 
 	m.HandleFunc("/weights", routerWeights)
 	m.HandleFunc("/trade", trade)

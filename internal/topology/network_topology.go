@@ -650,6 +650,18 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 		}
 		r1.NetworkRouter.Unpause()
 
+		weights = make([]string, 0, len(r2.Weights))
+
+		for mac, weight := range r2.Weights {
+			if weight.Router == router1 {
+				weights = append(weights, mac)
+			}
+		}
+		for _, mac := range weights {
+			r2.RemoveWeight(mac)
+			r2.NetworkRouter.RemoveNode([]byte(mac))
+		}
+
 	} else if r2.MachineId == topo.machineId && r1.MachineId != topo.machineId {
 		link, ok := r2.RouterLinks[router1]
 
@@ -678,6 +690,18 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 			r2.NetworkRouter.RemoveNode([]byte(mac))
 		}
 		r2.NetworkRouter.Unpause()
+
+		weights = make([]string, 0, len(r1.Weights))
+
+		for mac, weight := range r1.Weights {
+			if weight.Router == router2 {
+				weights = append(weights, mac)
+			}
+		}
+		for _, mac := range weights {
+			r1.RemoveWeight(mac)
+			r1.NetworkRouter.RemoveNode([]byte(mac))
+		}
 	}
 	return nil
 }

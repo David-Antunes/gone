@@ -7,6 +7,7 @@ import (
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"github.com/David-Antunes/gone/api"
 	addApi "github.com/David-Antunes/gone/api/Add"
+	disconnectApi "github.com/David-Antunes/gone/api/Disconnect"
 	opApi "github.com/David-Antunes/gone/api/Operations"
 	internal "github.com/David-Antunes/gone/internal/api"
 	"github.com/David-Antunes/gone/internal/cluster"
@@ -377,7 +378,7 @@ func (app *Follower) ConnectRouterToRouterLocally(router1ID string, router2ID st
 	return nil
 }
 
-func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID string, machineId string, linkProps network.LinkProps) error {
+func (app *Follower) ConnectRouterToRouter(router1ID string, router2ID string, machineID string, linkProps network.LinkProps) error {
 
 	if router1ID == router2ID {
 		return errors.New("can't connect a router to itself")
@@ -389,21 +390,53 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 		return errors.New("router not found")
 	}
 
-	if _, ok = r1.ConnectedRouters[router2ID]; ok {
-		return errors.New("router already connected")
-	}
-
-	r2, ok := app.topo.GetRouter(router2ID)
-
-	if !ok {
-		_, err := app.AddRouter(machineId, router2ID)
+	// Ensuring that fetching the desired remote router
+	// as not been deleted in the other instance
+	// If that is the case, then update the router with the new machineID
+	if r, ok := app.topo.GetRouter(router2ID); !ok {
+		var err error
+		_, err = app.topo.RegisterRouter(router2ID, machineID)
 		if err != nil {
 			return err
 		}
+	} else {
+		if r.MachineId != machineID {
+			r.MachineId = machineID
+		}
+	}
+
+	r2, _ := app.topo.GetRouter(router2ID)
+
+	if r1.MachineId == app.GetMachineId() {
+		if r2.MachineId == app.GetMachineId() {
+			l, err := app.topo.ConnectRouterToRouterLocal(router1ID, router2ID, linkProps)
+
+			if err != nil {
+				return err
+			}
+
+			graphDB.AddPath(router1ID, router2ID, l.ID(), linkProps.Weight)
+
+			app.PropagateNewRoutes(r1)
+			return nil
+		} else {
+			return app.connectRouterToRouterRemote(r1, r2, linkProps)
+		}
+	} else {
+		return app.RedirectConnection(r1, r2, linkProps)
 
 	}
+}
+
+func (app *Follower) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology.Router, linkProps network.LinkProps) error {
 	app.topo.Lock()
-	r2, _ = app.topo.GetRouter(router2ID)
+	if _, ok := r1.ConnectedRouters[r2.ID()]; ok {
+		return errors.New(r1.ID() + " is already connected to " + r2.ID())
+	}
+
+	if _, ok := r2.ConnectedRouters[r1.ID()]; ok {
+		return errors.New(r1.ID() + " is already connected to " + r2.ID())
+	}
 
 	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
 	conn := app.cl.Endpoints[r2.MachineId]
@@ -430,6 +463,7 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 
 	r1.AddRouter(r2, BiLink)
 	r2.AddRouter(r1, BiLink)
+
 	s := network.CreateRemoteShaper(r2.ID(), r1.ID(), router1Channel, app.icm.GetoutQueue(), linkProps)
 	s.SetDelay(d)
 	toLink.SetShaper(s)
@@ -449,8 +483,9 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 
 	_, err := app.cl.SendMsg(r2.MachineId, b, "connectRouterToRouterRemote")
 	if err != nil {
-		return err
+		return errors.New("couldn't contact machine")
 	}
+
 	graphDB.AddPath(r1.ID(), r2.ID(), BiLink.ID(), linkProps.Weight)
 	app.PropagateNewRoutes(r1)
 	return nil
@@ -470,10 +505,18 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 
 	r2, ok := app.topo.GetRouter(router2ID)
 
-	if !ok {
-		_, err := app.AddRouter(machineId, router2ID)
+	// Ensuring that fetching the desired remote router
+	// as not been deleted in the other instance
+	// If that is the case, then update the router with the new machineID
+	if r, ok := app.topo.GetRouter(router2ID); !ok {
+		var err error
+		_, err = app.topo.RegisterRouter(router2ID, machineId)
 		if err != nil {
 			return err
+		}
+	} else {
+		if r.MachineId != machineId {
+			r.MachineId = machineId
 		}
 	}
 
@@ -511,6 +554,33 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 	s.SetDelay(d)
 	toLink.Start()
 	app.PropagateNewRoutes(r1)
+	return nil
+}
+
+func (app *Follower) RedirectConnection(r1 *topology.Router, r2 *topology.Router, linkProps network.LinkProps) error {
+
+	b := &internal.ConnectRouterToRouterRequest{
+		R1:        r1.ID(),
+		R2:        r2.ID(),
+		MachineID: r1.MachineId,
+		Latency:   linkProps.Latency * 2.0,
+		Jitter:    linkProps.Jitter,
+		DropRate:  linkProps.DropRate,
+		Bandwidth: linkProps.Bandwidth * 8,
+		Weight:    linkProps.Weight,
+	}
+	resp, err := app.cl.SendMsg(r1.MachineId, b, "connectRouterToRouter")
+	if err != nil {
+		return errors.New("couldn't contact machine")
+	}
+
+	d := json.NewDecoder(resp.Body)
+	req := &internal.ConnectRouterToRouterResponse{}
+	err = d.Decode(&req)
+
+	if err != nil {
+		return errors.New("couldn't decode weights response")
+	}
 	return nil
 }
 
@@ -605,6 +675,7 @@ func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router)
 }
 
 func (app *Follower) ApplyRoutes(to string, from string, weights map[string]topology.Weight) {
+
 	r, ok := app.topo.GetRouter(to)
 
 	if !ok {
@@ -766,23 +837,113 @@ func (app *Follower) RemoveRouter(routerId string) error {
 		graphDB.RemoveRouter(routerId)
 	}
 
-	for _, router := range r.ConnectedRouters {
-		if router.MachineId != app.GetMachineId() {
-			app.icm.RemoveConnection(router.ID(), r.ID())
+	if r.MachineId == app.GetMachineId() {
+		graphDB.RemoveRouter(routerId)
+		for _, router := range r.ConnectedRouters {
+			if router.MachineId != app.GetMachineId() {
+				body := &disconnectApi.DisconnectRoutersRequest{
+					First:  routerId,
+					Second: router.ID(),
+				}
+				resp, err := app.cl.SendMsg(router.MachineId, body, "localDisconnect")
+				if err != nil {
+					return err
+				}
+
+				d := json.NewDecoder(resp.Body)
+				req := &disconnectApi.DisconnectRoutersResponse{}
+				err = d.Decode(&req)
+
+				if err != nil {
+					return err
+				}
+
+				if req.Error.ErrCode != 0 {
+					return errors.New(req.Error.ErrMsg)
+				}
+				app.icm.RemoveConnection(router.ID(), r.ID())
+			}
+		}
+		for _, router := range r.ConnectedRouters {
+			if router.MachineId != app.GetMachineId() {
+				app.icm.RemoveConnection(router.ID(), r.ID())
+			}
+
+		}
+
+		for _, link := range r.RouterLinks {
+			app.gcLinkShaper(link)
+		}
+
+		_, err := app.topo.RemoveRouter(routerId)
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+	return nil
+}
+
+func (app *Follower) LocalDisconnect(router1 string, router2 string) error {
+
+	r1, ok := app.topo.GetRouter(router1)
+
+	if !ok {
+		return errors.New(router1 + " ID doesn't exist")
+	}
+	r2, ok := app.topo.GetRouter(router2)
+
+	if !ok {
+		return errors.New(router2 + " ID doesn't exist")
+	}
+
+	if r1.MachineId == app.GetMachineId() {
+		graphDB.RemovePath(router1, router2)
+		link := r1.RouterLinks[router2]
+		err := app.topo.DisconnectRouters(router1, router2)
+		if err != nil {
+			return err
+		}
+		if link != nil {
+			app.gcLinkShaper(link)
+		}
+
+		if r2.MachineId != app.GetMachineId() {
+			app.icm.RemoveConnection(r2.ID(), r1.ID())
+			if len(r2.ConnectedRouters) == 0 {
+				_, err := app.topo.RemoveRouter(r2.ID())
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	} else {
+		if r2.MachineId == app.GetMachineId() {
+			graphDB.RemovePath(router1, router2)
+			link := r2.RouterLinks[router1]
+			err := app.topo.DisconnectRouters(router2, router1)
+			if err != nil {
+				return err
+			}
+			if link != nil {
+				app.gcLinkShaper(link)
+			}
+			app.icm.RemoveConnection(r1.ID(), r2.ID())
+			if len(r1.ConnectedRouters) == 0 {
+				_, err := app.topo.RemoveRouter(r1.ID())
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		} else {
+			fmt.Println("tried to disconnect two remote routers in a follower")
+			return nil
 		}
 	}
-
-	for _, link := range r.RouterLinks {
-		app.gcLinkShaper(link)
-	}
-
-	_, err := app.topo.RemoveRouter(routerId)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (app *Follower) DisconnectNode(id string) error {
@@ -857,6 +1018,7 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 
 	if r1.MachineId == app.GetMachineId() {
 		graphDB.RemovePath(router1, router2)
+
 		link := r1.RouterLinks[router2]
 		err := app.topo.DisconnectRouters(router1, router2)
 		if err != nil {
@@ -865,14 +1027,36 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 		if link != nil {
 			app.gcLinkShaper(link)
 		}
-
 		if r2.MachineId != app.GetMachineId() {
 			app.icm.RemoveConnection(r2.ID(), r1.ID())
+			body := &disconnectApi.DisconnectRoutersRequest{
+				First:  router2,
+				Second: router1,
+			}
+			resp, err := app.cl.SendMsg(r2.MachineId, body, "localDisconnect")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &disconnectApi.DisconnectRoutersResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
+
+			return nil
 		}
 		return nil
 	} else {
 		if r2.MachineId == app.GetMachineId() {
 			graphDB.RemovePath(router1, router2)
+
 			link := r2.RouterLinks[router1]
 			err := app.topo.DisconnectRouters(router2, router1)
 			if err != nil {
@@ -882,13 +1066,53 @@ func (app *Follower) DisconnectRouters(router1 string, router2 string) error {
 				app.gcLinkShaper(link)
 			}
 			app.icm.RemoveConnection(r1.ID(), r2.ID())
+			body := &disconnectApi.DisconnectRoutersRequest{
+				First:  router1,
+				Second: router2,
+			}
+			resp, err := app.cl.SendMsg(r1.MachineId, body, "localDisconnect")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &disconnectApi.DisconnectRoutersResponse{}
+			err = d.Decode(&req)
+
+			//if err != nil {
+			//	return err
+			//}
+			//
+			//if req.Error.ErrCode != 0 {
+			//	return errors.New(req.Error.ErrMsg)
+			//}
 			return nil
 		} else {
-			fmt.Println("tried to disconnect two remote routers in a follower")
+			body := &disconnectApi.DisconnectRoutersRequest{
+				First:  router1,
+				Second: router2,
+			}
+			resp, err := app.cl.SendMsg(r1.MachineId, body, "disconnectRouters")
+			if err != nil {
+				return err
+			}
+
+			d := json.NewDecoder(resp.Body)
+			req := &disconnectApi.DisconnectRoutersResponse{}
+			err = d.Decode(&req)
+
+			if err != nil {
+				return err
+			}
+
+			if req.Error.ErrCode != 0 {
+				return errors.New(req.Error.ErrMsg)
+			}
 			return nil
 		}
 	}
 }
+
 func (app *Follower) Propagate(routerId string) error {
 
 	r, ok := app.topo.GetRouter(routerId)

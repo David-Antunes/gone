@@ -271,10 +271,9 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 
 	if err := daemon.ParseRequest(r, req); err != nil {
 		daemonLog.Println("connectRouterToRouter:", err)
-		daemon.SendError(w, &internal.ConnectRouterToRouterResponse{
-			R1:        "",
-			R2:        "",
-			MachineID: "",
+		daemon.SendError(w, &connectApi.ConnectRouterToRouterResponse{
+			From: req.R1,
+			To:   req.R2,
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -286,10 +285,9 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 	linkProps, err := daemon.ParseLinkPropsInternal(req.Latency, req.Bandwidth, req.Jitter, req.DropRate, req.Weight)
 	if err != nil {
 		daemonLog.Println("connectRouterToRouter:", err)
-		daemon.SendError(w, &internal.ConnectRouterToRouterResponse{
-			R1:        "",
-			R2:        "",
-			MachineID: "",
+		daemon.SendError(w, &connectApi.ConnectRouterToRouterResponse{
+			From: req.R1,
+			To:   req.R2,
 			Error: apiErrors.Error{
 				ErrCode: 1,
 				ErrMsg:  err.Error(),
@@ -298,45 +296,26 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.MachineID == engine.app.GetMachineId() {
-		err := engine.app.ConnectRouterToRouterLocally(req.R1, req.R2, linkProps)
-		if err != nil {
+	err = engine.app.ConnectRouterToRouter(req.R1, req.R2, req.MachineID, linkProps)
 
-			daemonLog.Println("connectRouterToRouter:", err)
-			daemon.SendError(w, internal.ConnectRouterToRouterResponse{
-				R1:        "",
-				R2:        "",
-				MachineID: "",
-				Error: apiErrors.Error{
-					ErrCode: 1,
-					ErrMsg:  err.Error(),
-				},
-			})
-			return
-		}
-	} else {
-		err := engine.app.ConnectRouterToRouterRemote(req.R1, req.R2, req.MachineID, linkProps)
-		if err != nil {
+	if err != nil {
 
-			daemonLog.Println("connectRouterToRouter:", err)
-			daemon.SendError(w, internal.ConnectRouterToRouterResponse{
-				R1:        "",
-				R2:        "",
-				MachineID: "",
-				Error: apiErrors.Error{
-					ErrCode: 1,
-					ErrMsg:  err.Error(),
-				},
-			})
-			return
-		}
+		daemonLog.Println("connectRouterToRouter:", err)
+		daemon.SendError(w, &connectApi.ConnectRouterToRouterResponse{
+			From: req.R1,
+			To:   req.R2,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
 	}
 
-	daemon.SendResponse(w, &internal.ConnectRouterToRouterResponse{
-		R1:        req.R1,
-		R2:        req.R2,
-		MachineID: req.MachineID,
-		Error:     apiErrors.Error{},
+	daemon.SendResponse(w, &connectApi.ConnectRouterToRouterResponse{
+		From:  req.R1,
+		To:    req.R2,
+		Error: apiErrors.Error{},
 	})
 
 	daemonLog.Println("connectRouterToRouter:", "Connected", req.R1, "to", req.R2, "Properties:", linkProps)
@@ -553,7 +532,7 @@ func disconnectBridge(w http.ResponseWriter, r *http.Request) {
 	req := &disconnectApi.DisconnectBridgeRequest{}
 
 	if err := daemon.ParseRequest(r, req); err != nil {
-		daemonLog.Println("DisconnectNode:", err)
+		daemonLog.Println("DisconnectBridge:", err)
 		daemon.SendError(w, &disconnectApi.DisconnectBridgeResponse{
 			Name: req.Name,
 			Error: apiErrors.Error{
@@ -567,7 +546,7 @@ func disconnectBridge(w http.ResponseWriter, r *http.Request) {
 	err := engine.app.DisconnectBridge(req.Name)
 
 	if err != nil {
-		daemonLog.Println("disconnectNode:", err)
+		daemonLog.Println("disconnectBridge:", err)
 		daemon.SendError(w, &disconnectApi.DisconnectBridgeResponse{
 			Name: req.Name,
 			Error: apiErrors.Error{
@@ -585,7 +564,7 @@ func disconnectRouters(w http.ResponseWriter, r *http.Request) {
 	req := &disconnectApi.DisconnectRoutersRequest{}
 
 	if err := daemon.ParseRequest(r, req); err != nil {
-		daemonLog.Println("DisconnectNode:", err)
+		daemonLog.Println("DisconnectRouters:", err)
 		daemon.SendError(w, &disconnectApi.DisconnectRoutersResponse{
 			First:  req.First,
 			Second: req.Second,
@@ -600,7 +579,7 @@ func disconnectRouters(w http.ResponseWriter, r *http.Request) {
 	err := engine.app.DisconnectRouters(req.First, req.Second)
 
 	if err != nil {
-		daemonLog.Println("disconnectNode:", err)
+		daemonLog.Println("disconnectRouters:", err)
 		daemon.SendError(w, &disconnectApi.DisconnectRoutersResponse{
 			First:  req.First,
 			Second: req.Second,
@@ -618,6 +597,45 @@ func disconnectRouters(w http.ResponseWriter, r *http.Request) {
 		Error:  apiErrors.Error{},
 	})
 	daemonLog.Println("disconnectRouters:", "Disconnected", req.First, "from", req.Second)
+}
+
+func localDisconnect(w http.ResponseWriter, r *http.Request) {
+	req := &disconnectApi.DisconnectRoutersRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("localDisconnect:", err)
+		daemon.SendError(w, &disconnectApi.DisconnectRoutersResponse{
+			First:  req.First,
+			Second: req.Second,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.LocalDisconnect(req.First, req.Second)
+
+	if err != nil {
+		daemonLog.Println("localDisconnect:", err)
+		daemon.SendError(w, &disconnectApi.DisconnectRoutersResponse{
+			First:  req.First,
+			Second: req.Second,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	daemon.SendResponse(w, &disconnectApi.DisconnectRoutersResponse{
+		First:  req.First,
+		Second: req.Second,
+		Error:  apiErrors.Error{},
+	})
+	daemonLog.Println("localDisconnect:", "Disconnected", req.First, "from", req.Second)
 }
 
 func inspectNode(w http.ResponseWriter, r *http.Request) {
