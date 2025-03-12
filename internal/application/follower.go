@@ -397,7 +397,7 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 		}
 
 	}
-
+	app.topo.Lock()
 	r2, _ = app.topo.GetRouter(router2ID)
 
 	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
@@ -439,6 +439,9 @@ func (app *Follower) ConnectRouterToRouterRemote(router1ID string, router2ID str
 		Bandwidth: linkProps.Bandwidth * 8,
 		Weight:    linkProps.Weight,
 	}
+
+	app.topo.Unlock()
+
 	_, err := app.cl.SendMsg(r2.MachineId, b, "connectRouterToRouterRemote")
 	if err != nil {
 		return err
@@ -507,11 +510,12 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 }
 
 func (app *Follower) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
+	app.topo.Lock()
+	defer app.topo.Unlock()
 
 	biLink := r1.RouterLinks[r2.ID()]
 	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 
-	app.topo.Lock()
 	for mac, weight := range r1.Weights {
 
 		if existingWeight, ok := r2.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
@@ -623,6 +627,7 @@ func (app *Follower) ApplyRoutes(to string, from string, weights map[string]topo
 
 func (app *Follower) PropagateNewRoutes(r *topology.Router) {
 
+	app.topo.Lock()
 	visitedRouters := make(map[string]*topology.Router, app.topo.GetRouterNumber())
 
 	toVisit := make([]*topology.Router, 0)
@@ -634,6 +639,7 @@ func (app *Follower) PropagateNewRoutes(r *topology.Router) {
 			toVisit = append(toVisit, router)
 		}
 	}
+	app.topo.Unlock()
 
 	for len(toVisit) > 0 {
 

@@ -78,6 +78,8 @@ func (topo *Topology) GetBiLink(id string) (*BiLink, bool) {
 }
 
 func (topo *Topology) RegisterNode(id string, mac string, machineId string) (Node, error) {
+	topo.Lock()
+	defer topo.Unlock()
 	if n, ok := topo.nodes[id]; ok {
 		return *n, errors.New("node is already registered")
 	}
@@ -108,7 +110,8 @@ func (topo *Topology) RegisterNode(id string, mac string, machineId string) (Nod
 }
 
 func (topo *Topology) RegisterBridge(id string, machineId string) (Bridge, error) {
-
+	topo.Lock()
+	defer topo.Unlock()
 	if b, ok := topo.bridges[id]; ok {
 		return *b, errors.New("bridge already registered")
 	}
@@ -135,7 +138,8 @@ func (topo *Topology) RegisterBridge(id string, machineId string) (Bridge, error
 }
 
 func (topo *Topology) RegisterRouter(id string, machineId string) (Router, error) {
-
+	topo.Lock()
+	defer topo.Unlock()
 	if r, ok := topo.routers[id]; ok {
 		return *r, errors.New("router already registered")
 	}
@@ -222,6 +226,9 @@ func (topo *Topology) registerRemoteBiLink(toComponent Component, fromComponent 
 }
 
 func (topo *Topology) ConnectNodeToBridge(nodeID string, bridgeID string, linkProps network.LinkProps) (*BiLink, error) {
+	topo.Lock()
+	defer topo.Unlock()
+
 	var n *Node
 	var b *Bridge
 	var ok bool
@@ -272,7 +279,8 @@ func (topo *Topology) ConnectNodeToBridge(nodeID string, bridgeID string, linkPr
 }
 
 func (topo *Topology) ConnectBridgeToRouter(bridgeID string, routerID string, linkProps network.LinkProps) (*BiLink, error) {
-
+	topo.Lock()
+	defer topo.Unlock()
 	var b *Bridge
 	var r *Router
 	var ok bool
@@ -324,6 +332,9 @@ func (topo *Topology) ConnectBridgeToRouter(bridgeID string, routerID string, li
 
 func (topo *Topology) ConnectRouterToRouterLocal(router1 string, router2 string, linkProps network.LinkProps) (*BiLink, error) {
 
+	topo.Lock()
+	defer topo.Unlock()
+
 	var r1 *Router
 	var r2 *Router
 	var ok bool
@@ -356,6 +367,7 @@ func (topo *Topology) ConnectRouterToRouterLocal(router1 string, router2 string,
 }
 func (topo *Topology) InsertNewPath(path []string, frame *xdp.Frame, distance int) {
 	topo.Lock()
+	defer topo.Unlock()
 	currDistance := distance
 	router1 := topo.routers[path[0]]
 
@@ -371,11 +383,11 @@ func (topo *Topology) InsertNewPath(path []string, frame *xdp.Frame, distance in
 		}
 		router1 = router2
 	}
-	topo.Unlock()
 }
 
 func (topo *Topology) RemoveNode(nodeId string) (*Node, error) {
-
+	topo.Lock()
+	defer topo.Unlock()
 	n, ok := topo.nodes[nodeId]
 
 	if !ok {
@@ -417,6 +429,8 @@ func (topo *Topology) removeNodeFromRouters(mac []byte) {
 // TODO Add condition to verify if node has bridge associated, if not then do nothing
 func (topo *Topology) RemoveBridge(bridgeId string) (*Bridge, error) {
 
+	topo.Lock()
+	defer topo.Unlock()
 	b, ok := topo.bridges[bridgeId]
 
 	if !ok {
@@ -452,6 +466,8 @@ func (topo *Topology) RemoveBridge(bridgeId string) (*Bridge, error) {
 
 // TODO configure cleanup channel for
 func (topo *Topology) RemoveRouter(routerId string) (*Router, error) {
+
+	topo.Lock()
 	r, ok := topo.routers[routerId]
 
 	if !ok {
@@ -462,10 +478,13 @@ func (topo *Topology) RemoveRouter(routerId string) (*Router, error) {
 	for router, _ := range r.ConnectedRouters {
 		routers = append(routers, router)
 	}
+	topo.Unlock()
 	for _, router := range routers {
 		topo.DisconnectRouters(routerId, router)
 	}
 
+	topo.Lock()
+	topo.Unlock()
 	delete(topo.routers, routerId)
 	if r.MachineId != topo.machineId {
 		return r, nil
@@ -488,7 +507,8 @@ func (topo *Topology) RemoveRouter(routerId string) (*Router, error) {
 }
 
 func (topo *Topology) DisconnectNode(id string) error {
-
+	topo.Lock()
+	defer topo.Unlock()
 	n, ok := topo.GetNode(id)
 
 	if !ok {
@@ -518,6 +538,8 @@ func (topo *Topology) DisconnectNode(id string) error {
 
 func (topo *Topology) DisconnectBridge(id string) error {
 
+	topo.Lock()
+	defer topo.Unlock()
 	b, ok := topo.GetBridge(id)
 
 	if !ok {
@@ -545,6 +567,8 @@ func (topo *Topology) DisconnectBridge(id string) error {
 
 func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 
+	topo.Lock()
+	defer topo.Unlock()
 	r1, ok := topo.GetRouter(router1)
 
 	if !ok {
@@ -660,6 +684,8 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 
 func (topo *Topology) ForgetRoutes(routerId string) error {
 
+	topo.Lock()
+	defer topo.Unlock()
 	r, ok := topo.GetRouter(routerId)
 
 	if !ok {

@@ -462,7 +462,7 @@ func (app *Leader) ConnectRouterToRouter(router1ID string, router2ID string, lin
 }
 
 func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology.Router, linkProps network.LinkProps) error {
-
+	app.topo.Lock()
 	if _, ok := r1.ConnectedRouters[r2.ID()]; ok {
 		return errors.New(r1.ID() + " is already connected to " + r2.ID())
 	}
@@ -511,6 +511,9 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 		Bandwidth: linkProps.Bandwidth * 8,
 		Weight:    linkProps.Weight,
 	}
+
+	app.topo.Unlock()
+
 	_, err := app.cl.SendMsg(r2.MachineId, b, "connectRouterToRouterRemote")
 	if err != nil {
 		return errors.New("couldn't contact machine")
@@ -549,7 +552,7 @@ func (app *Leader) RedirectConnection(r1 *topology.Router, r2 *topology.Router, 
 }
 
 func (app *Leader) PropagateNewRoutes(r *topology.Router) {
-
+	app.topo.Lock()
 	visitedRouters := make(map[string]*topology.Router, app.topo.GetRouterNumber())
 
 	toVisit := make([]*topology.Router, 0)
@@ -561,6 +564,8 @@ func (app *Leader) PropagateNewRoutes(r *topology.Router) {
 			toVisit = append(toVisit, router)
 		}
 	}
+
+	app.topo.Unlock()
 
 	for len(toVisit) > 0 {
 
@@ -585,7 +590,8 @@ func (app *Leader) PropagateNewRoutes(r *topology.Router) {
 }
 
 func (app *Leader) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
-
+	app.topo.Lock()
+	defer app.topo.Unlock()
 	biLink := r1.RouterLinks[r2.ID()]
 	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 
@@ -697,7 +703,6 @@ func (app *Leader) ApplyRoutes(to string, from string, weights map[string]topolo
 
 }
 func (app *Leader) RemoveNode(nodeId string) error {
-
 	n, ok := app.topo.GetNode(nodeId)
 
 	if !ok {
