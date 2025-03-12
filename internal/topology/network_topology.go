@@ -583,11 +583,11 @@ func (topo *Topology) DisconnectRouters(router1 string, router2 string) error {
 	if r1.MachineId == topo.machineId && r2.MachineId == topo.machineId {
 
 		link, ok := r1.RouterLinks[router2]
-		link.NetworkBILink.Close()
 
 		if !ok {
 			return errors.New(router1 + " and " + router2 + " are not connected")
 		}
+		link.NetworkBILink.Close()
 		delete(topo.links, link.ID())
 
 		r1.RemoveRouter(router2)
