@@ -138,11 +138,11 @@ func main() {
 	cl = cluster.CreateCluster(id, viper.GetInt("NUM_TESTS"), time.Duration(viper.GetInt("TIMEOUT_REMOTE_RTT_MS"))*time.Millisecond)
 	cd := cluster.CreateClusterDaemon(cl, serverIP+":"+serverPort, serverIP+":"+framePort)
 
-	addr, err := net.ResolveUDPAddr("udp", ":"+framePort)
-	if err != nil {
-		panic(err)
-	}
-	r, err := net.ListenUDP("udp", addr)
+	//addr, err := net.ResolveUDPAddr("udp", serverIP+":"+framePort)
+	//if err != nil {
+	//	panic(err)
+	//}
+	r, err := net.ListenPacket("udp", ":"+framePort)
 	if err != nil {
 		fmt.Println(err)
 		panic("Proxy not running!")

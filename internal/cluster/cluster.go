@@ -13,7 +13,7 @@ import (
 type Cluster struct {
 	Primary   string
 	Nodes     map[string]ClusterNode
-	Endpoints map[string]*net.UDPAddr
+	Endpoints map[string]*net.UDPConn
 	Rtt       *RemoteRTTManager
 }
 
@@ -40,7 +40,7 @@ func CreateCluster(primary string, numObs int, timeout time.Duration) *Cluster {
 	return &Cluster{
 		Primary:   primary,
 		Nodes:     make(map[string]ClusterNode),
-		Endpoints: make(map[string]*net.UDPAddr),
+		Endpoints: make(map[string]*net.UDPConn),
 		Rtt:       NewClusterRTTManager(numObs, timeout),
 	}
 }
@@ -124,10 +124,11 @@ func (cl *Cluster) RegisterNode(node string, ipAddr string, udpAddr string) erro
 			panic(err)
 		}
 
-		//if err != nil {
-		//	return errors.New("failed to connect to node " + node)
-		//}
-		cl.Endpoints[node] = addr
+		conn, err := net.DialUDP("udp", nil, addr)
+		if err != nil {
+			return errors.New("failed to connect to node " + node)
+		}
+		cl.Endpoints[node] = conn
 		cl.Rtt.AddNode(node, ipAddr)
 	} else {
 		return errors.New("Node already registered")

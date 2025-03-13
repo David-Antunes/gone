@@ -3,6 +3,7 @@ package cluster
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"github.com/David-Antunes/gone/internal/network"
 	"log"
 	"net"
@@ -14,8 +15,8 @@ var icmLog = log.New(os.Stdout, "REMOTE INFO: ", log.Ltime)
 
 type InterCommunicationManager struct {
 	sync.Mutex
-	conn        *net.UDPConn
-	connections map[string]*net.UDPAddr
+	conn        net.PacketConn
+	connections map[string]*net.UDPConn
 	delays      map[string]*network.Delay
 	inQueue     chan *network.RouterFrame
 	outQueue    chan *network.RouterFrame
@@ -32,7 +33,7 @@ func CreateInterCommunicationManager() *InterCommunicationManager {
 	return &InterCommunicationManager{
 		Mutex:       sync.Mutex{},
 		conn:        nil,
-		connections: make(map[string]*net.UDPAddr),
+		connections: make(map[string]*net.UDPConn),
 		delays:      make(map[string]*network.Delay),
 		inQueue:     make(chan *network.RouterFrame, queueSize),
 		outQueue:    make(chan *network.RouterFrame, queueSize),
@@ -41,7 +42,7 @@ func CreateInterCommunicationManager() *InterCommunicationManager {
 		running:     false,
 	}
 }
-func (icm *InterCommunicationManager) SetConnection(conn *net.UDPConn) {
+func (icm *InterCommunicationManager) SetConnection(conn net.PacketConn) {
 	icm.Lock()
 	icm.conn = conn
 	icm.Unlock()
@@ -65,7 +66,7 @@ func (icm *InterCommunicationManager) Stop() {
 	icm.ctx <- struct{}{}
 }
 
-func (icm *InterCommunicationManager) AddConnection(remoteRouter string, delay *network.Delay, connection *net.UDPAddr, localRouter string, router *network.Router) {
+func (icm *InterCommunicationManager) AddConnection(remoteRouter string, delay *network.Delay, connection *net.UDPConn, localRouter string, router *network.Router) {
 	icm.Lock()
 	icmLog.Println("Adding connection to remote router", remoteRouter, "with delay", delay.Value, "from local router", localRouter)
 	icm.connections[remoteRouter] = connection
@@ -95,6 +96,7 @@ func (icm *InterCommunicationManager) receiveFrames() {
 				//frame.Frame.Time = time.Now().Add(-icm.delays[frame.From].Value)
 				router.InjectFrame(frame.Frame)
 			} else {
+				fmt.Println("Failed to inject frame to router", frame.To)
 			}
 
 			//icm.Unlock()
@@ -106,9 +108,9 @@ func (icm *InterCommunicationManager) receive() {
 
 	defer icm.conn.Close()
 
-	buffer := make([]byte, 2048)
 	for {
-		n, _, err := icm.conn.ReadFromUDP(buffer)
+		buffer := make([]byte, 2048)
+		n, _, err := icm.conn.ReadFrom(buffer)
 		if err != nil {
 			panic(err)
 		}
@@ -118,6 +120,7 @@ func (icm *InterCommunicationManager) receive() {
 		if err != nil {
 			panic(err)
 		}
+		//fmt.Println("Received from", addr, "Bytes:", n, frame.To)
 
 		if len(icm.inQueue) < queueSize {
 			icm.inQueue <- frame
@@ -126,19 +129,21 @@ func (icm *InterCommunicationManager) receive() {
 }
 
 func (icm *InterCommunicationManager) send() {
-	var response bytes.Buffer
-	enc := gob.NewEncoder(&response)
+
 	for {
 		select {
 		case <-icm.ctx:
 			return
 		case frame := <-icm.outQueue:
+			var response bytes.Buffer
+			enc := gob.NewEncoder(&response)
 			if enc.Encode(&frame) != nil {
 				log.Fatal("encode frame failed", frame)
 			} else {
 				icm.Lock()
-				if addr, ok := icm.connections[frame.To]; ok {
-					_, err := icm.conn.WriteToUDP(response.Bytes(), addr)
+				if conn, ok := icm.connections[frame.To]; ok {
+					_, err := conn.Write(response.Bytes())
+					//fmt.Println("Sent from iphopn", conn.RemoteAddr(), len(response.Bytes()))
 					if err != nil {
 						panic(err)
 					}

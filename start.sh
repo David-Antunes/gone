@@ -166,7 +166,7 @@ docker run -d --privileged --ulimit memlock=65535 --network none --name proxy-$N
 if $P_FLAG; then
     echo "Starting GONE as Leader."
     
-    docker run -d --privileged --name gone-$NAME -p 3000:3000 -p 3001:3001 -v /tmp:/tmp -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/proc                 \
+    docker run -d --privileged --name gone-$NAME --network host -p 3000:3000 -p 3001:3001 -v /tmp:/tmp -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/proc                 \
       -e GRAPHDB=$LOCAL_IP                \
       -e GRAPHDB_PASSWORD=""              \
       -e GRAPHDB_USER=""                  \
@@ -186,7 +186,7 @@ if $P_FLAG; then
 elif [[ -n "$SOURCE_IP" ]]; then
     echo "Starting GONE Follower using Leader IP: $SOURCE_IP"
     
-    docker run -d --privileged --name gone-$NAME -p 3000:3000 -p 3001:3001 -v /tmp:/tmp -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/proc                 \
+    docker run -d --privileged --name gone-$NAME --network host -p 3000:3000 -p 3001:3001 -v /tmp:/tmp -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/proc                 \
       -e GRAPHDB=$SOURCE_IP               \
       -e GRAPHDB_PASSWORD=""              \
       -e GRAPHDB_USER=""                  \
