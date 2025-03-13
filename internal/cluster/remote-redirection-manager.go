@@ -2,20 +2,22 @@ package cluster
 
 import (
 	"bytes"
-	"encoding/gob"
+	"encoding/binary"
 	"fmt"
+	"github.com/David-Antunes/gone-proxy/xdp"
 	"github.com/David-Antunes/gone/internal/network"
 	"log"
 	"net"
 	"os"
 	"sync"
+	"time"
 )
 
 var icmLog = log.New(os.Stdout, "REMOTE INFO: ", log.Ltime)
 
 type InterCommunicationManager struct {
 	sync.Mutex
-	conn        net.PacketConn
+	conn        *net.UDPConn
 	connections map[string]*net.UDPConn
 	delays      map[string]*network.Delay
 	inQueue     chan *network.RouterFrame
@@ -42,7 +44,7 @@ func CreateInterCommunicationManager() *InterCommunicationManager {
 		running:     false,
 	}
 }
-func (icm *InterCommunicationManager) SetConnection(conn net.PacketConn) {
+func (icm *InterCommunicationManager) SetConnection(conn *net.UDPConn) {
 	icm.Lock()
 	icm.conn = conn
 	icm.Unlock()
@@ -110,21 +112,17 @@ func (icm *InterCommunicationManager) receive() {
 
 	for {
 		buffer := make([]byte, 2048)
-		n, _, err := icm.conn.ReadFrom(buffer)
-		if err != nil {
+		if _, _, err := icm.conn.ReadFrom(buffer); err != nil {
 			panic(err)
 		}
-		dec := gob.NewDecoder(bytes.NewReader(buffer[:n]))
-		var frame *network.RouterFrame
-		err = dec.Decode(&frame)
-		if err != nil {
+		if frame, err := decodeMessage(buffer); err != nil {
 			panic(err)
+		} else {
+			if len(icm.inQueue) < queueSize {
+				icm.inQueue <- frame
+			}
 		}
-		//fmt.Println("Received from", addr, "Bytes:", n, frame.To)
 
-		if len(icm.inQueue) < queueSize {
-			icm.inQueue <- frame
-		}
 	}
 }
 
@@ -135,16 +133,13 @@ func (icm *InterCommunicationManager) send() {
 		case <-icm.ctx:
 			return
 		case frame := <-icm.outQueue:
-			var response bytes.Buffer
-			enc := gob.NewEncoder(&response)
-			if enc.Encode(&frame) != nil {
+
+			if buf, err := encodeMessage(frame); err != nil {
 				log.Fatal("encode frame failed", frame)
 			} else {
 				icm.Lock()
 				if conn, ok := icm.connections[frame.To]; ok {
-					_, err := conn.Write(response.Bytes())
-					//fmt.Println("Sent from iphopn", conn.RemoteAddr(), len(response.Bytes()))
-					if err != nil {
+					if _, err := conn.Write(buf); err != nil {
 						panic(err)
 					}
 				}
@@ -153,4 +148,114 @@ func (icm *InterCommunicationManager) send() {
 
 		}
 	}
+}
+
+func encodeMessage(frame *network.RouterFrame) ([]byte, error) {
+
+	buf := bytes.NewBuffer(make([]byte, 0, 2048))
+
+	if err := binary.Write(buf, binary.LittleEndian, uint32(len(frame.To))); err != nil {
+		return nil, err
+	}
+	if _, err := buf.Write([]byte(frame.To)); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Write(buf, binary.LittleEndian, uint32(len(frame.From))); err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.Write([]byte(frame.From)); err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.Write([]byte(frame.Frame.MacDestination)); err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.Write([]byte(frame.Frame.MacOrigin)); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Write(buf, binary.LittleEndian, frame.Frame.Time.Unix()); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Write(buf, binary.LittleEndian, int32(frame.Frame.Time.Nanosecond())); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(buf, binary.LittleEndian, uint32(frame.Frame.FrameSize)); err != nil {
+		return nil, err
+	}
+	if n, err := buf.Write(frame.Frame.FramePointer); err != nil || n != len(frame.Frame.FramePointer) {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func decodeMessage(data []byte) (*network.RouterFrame, error) {
+
+	buf := bytes.NewBuffer(data)
+
+	var toSize uint32
+	var fromSize uint32
+	macOrigin := make([]byte, 6)
+	macDestination := make([]byte, 6)
+	var frameSize uint32
+	var t int64
+	var tnano int32
+
+	if err := binary.Read(buf, binary.LittleEndian, &toSize); err != nil {
+		return nil, err
+	}
+	to := make([]byte, toSize)
+	if _, err := buf.Read(to); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(buf, binary.LittleEndian, &fromSize); err != nil {
+		return nil, err
+	}
+
+	from := make([]byte, fromSize)
+	if err := binary.Read(buf, binary.LittleEndian, &from); err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.Read(macDestination); err != nil {
+		return nil, err
+	}
+
+	if _, err := buf.Read(macOrigin); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(buf, binary.LittleEndian, &t); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(buf, binary.LittleEndian, &tnano); err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(buf, binary.LittleEndian, &frameSize); err != nil {
+		return nil, err
+	}
+
+	framePointer := make([]byte, frameSize)
+
+	if n, err := buf.Read(framePointer); err != nil || n != len(framePointer) {
+		return nil, err
+	}
+	return &network.RouterFrame{
+		To:   string(to),
+		From: string(from),
+		Frame: &xdp.Frame{
+			FramePointer:   framePointer,
+			FrameSize:      int(frameSize),
+			Time:           time.Unix(t, int64(tnano)),
+			MacOrigin:      string(macOrigin),
+			MacDestination: string(macDestination),
+		},
+	}, nil
 }

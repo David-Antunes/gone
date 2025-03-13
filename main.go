@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"sort"
 	"syscall"
 	"time"
@@ -103,11 +104,11 @@ func main() {
 		emulationLog.Println(err)
 	}
 
-	//f, err := os.Create("profiler.prof")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//pprof.StartCPUProfile(f)
+	f, err := os.Create("/tmp/profiler.prof")
+	if err != nil {
+		log.Fatal(err)
+	}
+	pprof.StartCPUProfile(f)
 
 	rttSocket, err := net.Dial("unix", viper.GetString("PROXY_RTT_SOCKET"))
 	if err != nil {
@@ -138,11 +139,11 @@ func main() {
 	cl = cluster.CreateCluster(id, viper.GetInt("NUM_TESTS"), time.Duration(viper.GetInt("TIMEOUT_REMOTE_RTT_MS"))*time.Millisecond)
 	cd := cluster.CreateClusterDaemon(cl, serverIP+":"+serverPort, serverIP+":"+framePort)
 
-	//addr, err := net.ResolveUDPAddr("udp", serverIP+":"+framePort)
-	//if err != nil {
-	//	panic(err)
-	//}
-	r, err := net.ListenPacket("udp", ":"+framePort)
+	addr, err := net.ResolveUDPAddr("udp", serverIP+":"+framePort)
+	if err != nil {
+		panic(err)
+	}
+	r, err := net.ListenUDP("udp", addr)
 	if err != nil {
 		fmt.Println(err)
 		panic("Proxy not running!")
