@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"github.com/David-Antunes/gone/internal"
 	"github.com/David-Antunes/gone/internal/network"
-	"github.com/David-Antunes/gone/internal/proxy"
 	"strconv"
 	"sync"
 )
@@ -86,15 +86,15 @@ func (topo *Topology) RegisterNode(id string, mac string, machineId string) (Nod
 	var n *network.Node = nil
 	if topo.machineId == machineId {
 
-		incoming := make(chan *xdp.Frame, queueSize)
-		outgoing := make(chan *xdp.Frame, queueSize)
+		incoming := make(chan *xdp.Frame, internal.QueueSize)
+		outgoing := make(chan *xdp.Frame, internal.QueueSize)
 
 		topo.fl.AddMac([]byte(mac), incoming, outgoing)
-		n = network.CreateNode(string(proxy.ConvertMacStringToBytes(mac)), incoming, outgoing, network.CreateBILink(network.CreateNullLink(incoming), nil))
+		n = network.CreateNode(string(internal.ConvertMacStringToBytes(mac)), incoming, outgoing, network.CreateBILink(network.CreateNullLink(incoming), nil))
 		n.GetLink().GetLeft().Start()
 
 	} else {
-		n = network.CreateNode(string(proxy.ConvertMacStringToBytes(mac)), nil, nil, nil)
+		n = network.CreateNode(string(internal.ConvertMacStringToBytes(mac)), nil, nil, nil)
 	}
 
 	component := &Node{
@@ -105,7 +105,7 @@ func (topo *Topology) RegisterNode(id string, mac string, machineId string) (Nod
 		MachineId:   machineId,
 	}
 	topo.nodes[id] = component
-	topo.macs[string(proxy.ConvertMacStringToBytes(mac))] = component
+	topo.macs[string(internal.ConvertMacStringToBytes(mac))] = component
 	return *component, nil
 }
 
@@ -119,7 +119,7 @@ func (topo *Topology) RegisterBridge(id string, machineId string) (Bridge, error
 	var b *network.Bridge = nil
 	if topo.machineId == machineId {
 		b = network.CreateBridge()
-		b.SetGateway(network.GetNullChan())
+		b.SetGateway(internal.GetNullChan())
 		b.Start()
 	}
 

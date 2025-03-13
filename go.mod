@@ -8,6 +8,7 @@ require (
 	github.com/David-Antunes/gone-proxy v1.1.3
 	github.com/neo4j/neo4j-go-driver/v5 v5.28.0
 	github.com/spf13/viper v1.19.0
+	golang.org/x/net v0.37.0
 	golang.org/x/time v0.11.0
 )
 

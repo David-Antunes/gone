@@ -3,6 +3,7 @@ package cluster
 import (
 	"encoding/gob"
 	"fmt"
+	"github.com/David-Antunes/gone/internal"
 	"github.com/David-Antunes/gone/internal/network"
 	"log"
 	"net"
@@ -13,10 +14,10 @@ import (
 var icmLog = log.New(os.Stdout, "REMOTE INFO: ", log.Ltime)
 
 type InterCommunicationManager struct {
-	sync.Mutex
+	sync.RWMutex
 	conn          net.Listener
-	connections   map[string]*gob.Encoder
-	remoteRouters map[string]*gob.Encoder
+	connections   map[string]chan *network.RouterFrame
+	remoteRouters map[string]chan *network.RouterFrame
 	delays        map[string]*network.Delay
 	inQueue       chan *network.RouterFrame
 	outQueue      chan *network.RouterFrame
@@ -31,23 +32,22 @@ func (icm *InterCommunicationManager) GetoutQueue() chan *network.RouterFrame {
 
 func CreateInterCommunicationManager() *InterCommunicationManager {
 	return &InterCommunicationManager{
-		Mutex:         sync.Mutex{},
+		RWMutex:       sync.RWMutex{},
 		conn:          nil,
-		connections:   make(map[string]*gob.Encoder),
-		remoteRouters: make(map[string]*gob.Encoder),
+		connections:   make(map[string]chan *network.RouterFrame),
+		remoteRouters: make(map[string]chan *network.RouterFrame),
 		delays:        make(map[string]*network.Delay),
-		inQueue:       make(chan *network.RouterFrame, queueSize),
-		outQueue:      make(chan *network.RouterFrame, queueSize),
+		inQueue:       make(chan *network.RouterFrame, internal.RemoteQueueSize),
+		outQueue:      make(chan *network.RouterFrame, internal.RemoteQueueSize),
 		routers:       make(map[string]*network.Router),
 		ctx:           make(chan struct{}),
 		running:       false,
 	}
 }
 func (icm *InterCommunicationManager) SetConnection(conn net.Listener) {
-	icm.Lock()
 	icm.conn = conn
-	icm.Unlock()
 }
+
 func (icm *InterCommunicationManager) Start() {
 	if !icm.running {
 		if icm.conn == nil {
@@ -82,7 +82,8 @@ func (icm *InterCommunicationManager) AddMachine(conn net.Conn, machineId string
 	icm.Lock()
 	defer icm.Unlock()
 	if _, ok := icm.connections[machineId]; !ok {
-		icm.connections[machineId] = gob.NewEncoder(conn)
+		icm.connections[machineId] = make(chan *network.RouterFrame, internal.QueueSize)
+		go sendMachine(conn, icm.connections[machineId])
 	}
 }
 
@@ -124,6 +125,19 @@ func (icm *InterCommunicationManager) receiveFrames() {
 	}
 }
 
+func sendMachine(conn net.Conn, channel chan *network.RouterFrame) {
+	enc := gob.NewEncoder(conn)
+	for {
+		select {
+
+		case frame := <-channel:
+			if err := enc.Encode(frame); err != nil {
+				fmt.Println("Error:", err)
+			}
+		}
+	}
+}
+
 func (icm *InterCommunicationManager) receive(conn net.Conn) {
 	defer conn.Close()
 	dec := gob.NewDecoder(conn)
@@ -133,7 +147,7 @@ func (icm *InterCommunicationManager) receive(conn net.Conn) {
 		if err != nil {
 			panic(err)
 		}
-		if len(icm.inQueue) < queueSize {
+		if len(icm.inQueue) < internal.RemoteQueueSize {
 			icm.inQueue <- frame
 		}
 	}
@@ -145,17 +159,13 @@ func (icm *InterCommunicationManager) send() {
 		case <-icm.ctx:
 			return
 		case frame := <-icm.outQueue:
-			icm.Lock()
-			conn, ok := icm.remoteRouters[frame.To]
-			if ok {
-				err := conn.Encode(&frame)
-				if err != nil {
-					panic(err)
-				}
+			icm.RLock()
+			if conn, ok := icm.remoteRouters[frame.To]; ok {
+				conn <- frame
 			} else {
 				fmt.Println("No router for ", frame.To)
 			}
-			icm.Unlock()
+			icm.RUnlock()
 		}
 	}
 }

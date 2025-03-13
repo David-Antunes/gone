@@ -1,6 +1,7 @@
 package topology
 
 import (
+	"github.com/David-Antunes/gone/internal"
 	"github.com/David-Antunes/gone/internal/network"
 )
 
@@ -43,6 +44,6 @@ func (bridge *Bridge) RemoveRouter() {
 		bridge.Router = nil
 		bridge.RouterLink.NetworkBILink.Close()
 		bridge.RouterLink = nil
-		bridge.NetworkBridge.SetGateway(network.GetNullChan())
+		bridge.NetworkBridge.SetGateway(internal.GetNullChan())
 	}
 }

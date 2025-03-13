@@ -9,7 +9,8 @@ import (
 	addApi "github.com/David-Antunes/gone/api/Add"
 	disconnectApi "github.com/David-Antunes/gone/api/Disconnect"
 	opApi "github.com/David-Antunes/gone/api/Operations"
-	internal "github.com/David-Antunes/gone/internal/api"
+	"github.com/David-Antunes/gone/internal"
+	internalApi "github.com/David-Antunes/gone/internal/api"
 	"github.com/David-Antunes/gone/internal/cluster"
 	"github.com/David-Antunes/gone/internal/docker"
 	"github.com/David-Antunes/gone/internal/graphDB"
@@ -245,7 +246,7 @@ func (app *Follower) AddNode(machineId string, dockerCmd []string) (string, stri
 		return "", "", "", err
 	}
 
-	_, err = app.cl.Broadcast(&internal.RegisterNodeRequest{
+	_, err = app.cl.Broadcast(&internalApi.RegisterNodeRequest{
 		Id:        id,
 		Ip:        ip,
 		Mac:       mac,
@@ -438,7 +439,7 @@ func (app *Follower) connectRouterToRouterRemote(r1 *topology.Router, r2 *topolo
 		return errors.New(r1.ID() + " is already connected to " + r2.ID())
 	}
 
-	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
+	router1Channel := make(chan *xdp.Frame, internal.QueueSize)
 	conn := app.cl.Endpoints[r2.MachineId]
 	d, _ := app.cl.GetNodeDelay(r2.MachineId)
 	// Temporary Fix
@@ -468,7 +469,7 @@ func (app *Follower) connectRouterToRouterRemote(r1 *topology.Router, r2 *topolo
 	s.SetDelay(d)
 	toLink.SetShaper(s)
 	toLink.Start()
-	b := &internal.ConnectRouterToRouterRequest{
+	b := &internalApi.ConnectRouterToRouterRequest{
 		R1:        r2.ID(),
 		R2:        r1.ID(),
 		MachineID: r1.MachineId,
@@ -522,7 +523,7 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 
 	r2, _ = app.topo.GetRouter(router2ID)
 
-	router1Channel := make(chan *xdp.Frame, _REMOTE_QUEUESIZE)
+	router1Channel := make(chan *xdp.Frame, internal.QueueSize)
 	conn := app.cl.Endpoints[r2.MachineId]
 	d, _ := app.cl.GetNodeDelay(r2.MachineId)
 	// Temporary Fix
@@ -559,7 +560,7 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 
 func (app *Follower) RedirectConnection(r1 *topology.Router, r2 *topology.Router, linkProps network.LinkProps) error {
 
-	b := &internal.ConnectRouterToRouterRequest{
+	b := &internalApi.ConnectRouterToRouterRequest{
 		R1:        r1.ID(),
 		R2:        r2.ID(),
 		MachineID: r1.MachineId,
@@ -575,7 +576,7 @@ func (app *Follower) RedirectConnection(r1 *topology.Router, r2 *topology.Router
 	}
 
 	d := json.NewDecoder(resp.Body)
-	req := &internal.ConnectRouterToRouterResponse{}
+	req := &internalApi.ConnectRouterToRouterResponse{}
 	err = d.Decode(&req)
 
 	if err != nil {
@@ -619,7 +620,7 @@ func (app *Follower) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 }
 
 func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router) error {
-	b := &internal.GetRouterWeightsRequest{
+	b := &internalApi.GetRouterWeightsRequest{
 		Router: r2.ID(),
 	}
 	resp, err := app.cl.SendMsg(r2.MachineId, b, "weights")
@@ -628,7 +629,7 @@ func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router)
 	}
 
 	d := json.NewDecoder(resp.Body)
-	req := &internal.GetRouterWeightsResponse{}
+	req := &internalApi.GetRouterWeightsResponse{}
 	err = d.Decode(&req)
 
 	if err != nil {
@@ -653,7 +654,7 @@ func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router)
 	}
 	app.topo.Unlock()
 
-	body := &internal.TradeRoutesRequest{
+	body := &internalApi.TradeRoutesRequest{
 		To:      r2.ID(),
 		From:    r1.ID(),
 		Weights: r1.Weights,
@@ -665,7 +666,7 @@ func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router)
 	}
 
 	d = json.NewDecoder(resp.Body)
-	tradeReq := &internal.TradeRoutesResponse{}
+	tradeReq := &internalApi.TradeRoutesResponse{}
 	err = d.Decode(&tradeReq)
 
 	if err != nil {
@@ -762,7 +763,7 @@ func (app *Follower) RemoveNode(nodeId string) error {
 
 	if n.MachineId == app.GetMachineId() {
 
-		body := &internal.ClearNodeRequest{
+		body := &internalApi.ClearNodeRequest{
 			Id: nodeId,
 		}
 
@@ -774,7 +775,7 @@ func (app *Follower) RemoveNode(nodeId string) error {
 		for _, result := range resp {
 
 			d := json.NewDecoder(result.Body)
-			req := &internal.ClearNodeResponse{}
+			req := &internalApi.ClearNodeResponse{}
 			err = d.Decode(&req)
 
 			if err != nil {

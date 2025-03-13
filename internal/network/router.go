@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"github.com/David-Antunes/gone/internal"
 	"github.com/David-Antunes/gone/internal/network/routing"
 	"sync"
 	"time"
@@ -24,9 +25,9 @@ func CreateRouter(id string) *Router {
 		RWMutex:         sync.RWMutex{},
 		id:              id,
 		channels:        make(map[string]chan *xdp.Frame),
-		incomingChannel: make(chan *xdp.Frame, queueSize),
+		incomingChannel: make(chan *xdp.Frame, internal.ComponentQueueSize),
 		running:         false,
-		queue:           make(chan *xdp.Frame, queueSize),
+		queue:           make(chan *xdp.Frame, internal.QueueSize),
 		ctx:             make(chan struct{}, 2),
 		disrupted: disruptLogic{
 			disrupted: false,
@@ -97,7 +98,7 @@ func (router *Router) receive() {
 			return
 
 		case frame := <-router.incomingChannel:
-			if len(router.queue) < queueSize {
+			if len(router.queue) < internal.QueueSize {
 				router.queue <- frame
 				//} else {
 				//	fmt.Println(router.id, "Queue Full!")
@@ -114,7 +115,9 @@ func (router *Router) send() {
 		case frame := <-router.queue:
 			router.RLock()
 			if channel, ok := router.channels[frame.GetMacDestination()]; ok {
-				channel <- frame
+				if len(channel) < internal.QueueSize {
+					channel <- frame
+				}
 				router.RUnlock()
 			} else {
 				router.RUnlock()
@@ -127,7 +130,9 @@ func (router *Router) send() {
 func (router *Router) InjectFrame(frame *xdp.Frame) {
 	router.RLock()
 	if channel, ok := router.channels[frame.GetMacDestination()]; ok {
-		channel <- frame
+		if len(channel) < internal.QueueSize {
+			channel <- frame
+		}
 		router.RUnlock()
 	} else {
 		router.RUnlock()

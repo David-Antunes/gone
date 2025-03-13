@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"github.com/David-Antunes/gone/internal"
 	redirect_traffic "github.com/David-Antunes/gone/internal/redirect-traffic"
 	"golang.org/x/time/rate"
 	"time"
@@ -46,18 +47,18 @@ func (shaper *InterceptShaper) GetRtID() string {
 }
 
 func NewInterceptShaper(incoming chan *xdp.Frame, outgoing chan *xdp.Frame, props LinkProps, rt *redirect_traffic.InterceptComponent) Shaper {
-	aux := float64(packetSize) / float64(props.Bandwidth)
+	aux := float64(internal.PacketSize) / float64(props.Bandwidth)
 	newTime := float64(time.Second) * aux
 
 	return &InterceptShaper{
 		running:   false,
-		queue:     make(chan *xdp.Frame, queueSize),
+		queue:     make(chan *xdp.Frame, internal.QueueSize),
 		incoming:  incoming,
 		outgoing:  outgoing,
 		props:     props,
 		delay:     &Delay{0},
 		limiter:   rate.NewLimiter(rate.Every(time.Duration(newTime)), 1),
-		tokenSize: packetSize,
+		tokenSize: internal.PacketSize,
 		ctx:       make(chan struct{}, 2),
 		rt:        rt,
 		disrupted: disruptLogic{
@@ -141,7 +142,7 @@ func (shaper *InterceptShaper) receive() {
 			if shaper.props.PollDropRate() {
 				continue
 			}
-			if len(shaper.queue) < queueSize {
+			if len(shaper.queue) < internal.QueueSize {
 				shaper.queue <- frame
 				//} else {
 				//	fmt.Println("Queue Full!")
@@ -164,7 +165,7 @@ func (shaper *InterceptShaper) send() {
 				if !r.OK() {
 					fmt.Println("Something went wrong")
 				}
-				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + packetSize
+				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + internal.PacketSize
 				frame.Time = frame.Time.Add(r.Delay())
 			} else {
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize
@@ -172,7 +173,7 @@ func (shaper *InterceptShaper) send() {
 
 			//go func() {
 			time.Sleep(time.Until(frame.Time))
-			if len(shaper.outgoing) < queueSize {
+			if len(shaper.outgoing) < internal.ComponentQueueSize {
 				shaper.outgoing <- frame
 				//} else {
 				//	fmt.Println("Queue Full!")

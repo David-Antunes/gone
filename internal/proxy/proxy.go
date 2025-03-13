@@ -3,6 +3,7 @@ package proxy
 import (
 	"encoding/gob"
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"github.com/David-Antunes/gone/internal"
 	"log"
 	"net"
 	"os"
@@ -73,7 +74,7 @@ func receive(mac string, dec *gob.Decoder, incoming chan *xdp.Frame) {
 			proxyLog.Println(mac+":", err)
 			return
 		}
-		if len(incoming) < queueSize {
+		if len(incoming) < internal.ProxyQueueSize {
 			//frame.Time = frame.Time.Add(-time.Now().Sub(frame.Time))
 			incoming <- frame
 			//} else {

@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"github.com/David-Antunes/gone/internal"
 	"golang.org/x/time/rate"
 	"time"
 )
@@ -41,17 +42,17 @@ func (shaper *RemoteShaper) GetDelay() *Delay {
 }
 
 func CreateRemoteShaper(to string, from string, incoming chan *xdp.Frame, outgoing chan *RouterFrame, props LinkProps) Shaper {
-	aux := float64(packetSize / props.Bandwidth)
+	aux := float64(internal.PacketSize / props.Bandwidth)
 	newTime := float64(time.Second) * aux
 
 	return &RemoteShaper{
 		running:   false,
-		queue:     make(chan *xdp.Frame, queueSize),
+		queue:     make(chan *xdp.Frame, internal.QueueSize),
 		incoming:  incoming,
 		outgoing:  outgoing,
 		props:     props,
 		limiter:   rate.NewLimiter(rate.Every(time.Duration(newTime)), 1),
-		tokenSize: packetSize,
+		tokenSize: internal.PacketSize,
 		delay:     &Delay{0},
 		ctx:       make(chan struct{}),
 		To:        to,
@@ -89,7 +90,7 @@ func (shaper *RemoteShaper) receive() {
 			if shaper.props.PollDropRate() {
 				continue
 			}
-			if len(shaper.queue) < queueSize {
+			if len(shaper.queue) < internal.QueueSize {
 				shaper.queue <- frame
 				//} else {
 				//	fmt.Println("Queue Full!")
@@ -112,14 +113,14 @@ func (shaper *RemoteShaper) send() {
 				if !r.OK() {
 					fmt.Println("Something went wrong")
 				}
-				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + packetSize
+				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + internal.PacketSize
 				frame.Time = frame.Time.Add(r.Delay())
 			} else {
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize
 			}
 			//go func() {
 			time.Sleep(time.Until(frame.Time))
-			if len(shaper.outgoing) < queueSize {
+			if len(shaper.outgoing) < internal.RemoteQueueSize {
 				shaper.outgoing <- &RouterFrame{
 					To:    shaper.To,
 					From:  shaper.From,

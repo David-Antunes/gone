@@ -103,7 +103,7 @@ func main() {
 		emulationLog.Println(err)
 	}
 
-	//f, err := os.Create("profiler.prof")
+	//f, err := os.Create("/tmp/profiler.prof")
 	//if err != nil {
 	//	log.Fatal(err)
 	//}

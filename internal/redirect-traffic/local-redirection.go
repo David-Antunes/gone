@@ -4,12 +4,9 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"github.com/David-Antunes/gone/internal"
 	"net"
 	"os"
-)
-
-const (
-	queueSize = 1000
 )
 
 type RedirectionSocket struct {
@@ -46,8 +43,8 @@ func NewRedirectionSocket(id string, socketPath string) (*RedirectionSocket, err
 		id:         id,
 		socketPath: socketPath,
 		sock:       socket,
-		incoming:   make(chan *xdp.Frame, queueSize),
-		outgoing:   make(chan *xdp.Frame, queueSize),
+		incoming:   make(chan *xdp.Frame, internal.QueueSize),
+		outgoing:   make(chan *xdp.Frame, internal.QueueSize),
 	}, nil
 }
 

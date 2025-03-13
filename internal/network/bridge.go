@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"github.com/David-Antunes/gone/internal"
 	"sync"
 	"time"
 )
@@ -23,11 +24,11 @@ func CreateBridge() *Bridge {
 	return &Bridge{
 		RWMutex:         sync.RWMutex{},
 		channels:        make(map[string]chan *xdp.Frame),
-		incomingChannel: make(chan *xdp.Frame, queueSize),
+		incomingChannel: make(chan *xdp.Frame, internal.ComponentQueueSize),
 		gateway:         nil,
 		link:            nil,
 		running:         false,
-		queue:           make(chan *xdp.Frame, queueSize),
+		queue:           make(chan *xdp.Frame, internal.QueueSize),
 		ctx:             make(chan struct{}, 2),
 		disrupted: disruptLogic{
 			disrupted: false,
@@ -104,7 +105,7 @@ func (bridge *Bridge) receive() {
 			return
 
 		case frame := <-bridge.incomingChannel:
-			if len(bridge.queue) < queueSize {
+			if len(bridge.queue) < internal.QueueSize {
 				bridge.queue <- frame
 				//} else {
 				//	fmt.Println("Queue Full!")
@@ -161,7 +162,7 @@ func (bridge *Bridge) send() {
 			return
 
 		case frame := <-bridge.queue:
-			if bytes.Equal([]byte(frame.MacDestination), broadcastAddr) {
+			if bytes.Equal([]byte(frame.MacDestination), internal.BroadcastAddr) {
 				bridge.RLock()
 				for _, channel := range bridge.channels {
 					channel <- frame
@@ -173,7 +174,9 @@ func (bridge *Bridge) send() {
 			if channel, ok := bridge.channels[frame.GetMacDestination()]; ok {
 				channel <- frame
 			} else {
-				bridge.gateway <- frame
+				if len(bridge.gateway) < internal.QueueSize {
+					bridge.gateway <- frame
+				}
 			}
 			bridge.RUnlock()
 		}

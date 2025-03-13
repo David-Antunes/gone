@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
+	"github.com/David-Antunes/gone/internal"
 	redirect_traffic "github.com/David-Antunes/gone/internal/redirect-traffic"
 	"time"
 
@@ -43,17 +44,17 @@ func (shaper *NetworkShaper) SetDelay(delay *Delay) {
 }
 
 func CreateNetworkShaper(incoming chan *xdp.Frame, outgoing chan *xdp.Frame, props LinkProps) Shaper {
-	aux := packetSize / float64(props.Bandwidth)
+	aux := internal.PacketSize / float64(props.Bandwidth)
 	newTime := float64(time.Second) * aux
 	return &NetworkShaper{
 		running:   false,
-		queue:     make(chan *xdp.Frame, queueSize),
+		queue:     make(chan *xdp.Frame, internal.QueueSize),
 		incoming:  incoming,
 		outgoing:  outgoing,
 		delay:     &Delay{0},
 		props:     props,
 		limiter:   rate.NewLimiter(rate.Every(time.Duration(newTime)), 1),
-		tokenSize: packetSize,
+		tokenSize: internal.PacketSize,
 		ctx:       make(chan struct{}, 2),
 		disrupted: disruptLogic{
 			disrupted: false,
@@ -138,7 +139,7 @@ func (shaper *NetworkShaper) receiveLatency() {
 			if shaper.props.PollDropRate() {
 				continue
 			}
-			if len(shaper.queue) < queueSize {
+			if len(shaper.queue) < internal.QueueSize {
 				shaper.queue <- frame
 				//} else {
 				//	fmt.Println("Queue Full!")
@@ -156,7 +157,7 @@ func (shaper *NetworkShaper) receiveNoLatency() {
 
 		case frame := <-shaper.incoming:
 			frame.Time = frame.Time.Add(-shaper.delay.Value)
-			if len(shaper.queue) < queueSize {
+			if len(shaper.queue) < internal.ComponentQueueSize {
 				shaper.queue <- frame
 				//} else {
 				//	fmt.Println("Queue Full!")
@@ -179,7 +180,7 @@ func (shaper *NetworkShaper) send() {
 				if !r.OK() {
 					fmt.Println("Something went wrong")
 				}
-				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + packetSize
+				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + internal.PacketSize
 
 				frame.Time = frame.Time.Add(r.Delay())
 			} else {
@@ -187,7 +188,7 @@ func (shaper *NetworkShaper) send() {
 			}
 			//go func() {
 			time.Sleep(time.Until(frame.Time))
-			if len(shaper.outgoing) < queueSize {
+			if len(shaper.outgoing) < internal.ComponentQueueSize {
 				shaper.outgoing <- frame
 				//} else {
 				//fmt.Println("Queue Full!")
