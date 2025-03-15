@@ -144,8 +144,6 @@ func (shaper *InterceptShaper) receive() {
 			}
 			if len(shaper.queue) < internal.QueueSize {
 				shaper.queue <- frame
-				//} else {
-				//	fmt.Println("Queue Full!")
 			}
 		}
 	}
@@ -166,19 +164,18 @@ func (shaper *InterceptShaper) send() {
 					fmt.Println("Something went wrong")
 				}
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + internal.PacketSize
-				frame.Time = frame.Time.Add(r.Delay())
+
+				time.Sleep(r.Delay())
 			} else {
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize
 			}
 
-			//go func() {
-			time.Sleep(time.Until(frame.Time))
-			if len(shaper.outgoing) < internal.ComponentQueueSize {
-				shaper.outgoing <- frame
-				//} else {
-				//	fmt.Println("Queue Full!")
-			}
-			//}()
+			go func() {
+				time.Sleep(time.Until(frame.Time))
+				if len(shaper.outgoing) < internal.ComponentQueueSize {
+					shaper.outgoing <- frame
+				}
+			}()
 
 		}
 	}

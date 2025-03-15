@@ -165,14 +165,18 @@ func (bridge *Bridge) send() {
 			if bytes.Equal([]byte(frame.MacDestination), internal.BroadcastAddr) {
 				bridge.RLock()
 				for _, channel := range bridge.channels {
-					channel <- frame
+					if len(channel) < internal.QueueSize {
+						channel <- frame
+					}
 				}
 				bridge.RUnlock()
 				continue
 			}
 			bridge.RLock()
 			if channel, ok := bridge.channels[frame.GetMacDestination()]; ok {
-				channel <- frame
+				if len(channel) < internal.QueueSize {
+					channel <- frame
+				}
 			} else {
 				if len(bridge.gateway) < internal.QueueSize {
 					bridge.gateway <- frame
