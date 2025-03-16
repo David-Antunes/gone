@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"runtime/pprof"
 )
 
 type server struct {
@@ -14,6 +16,7 @@ type server struct {
 	socket     net.Listener
 	app        *application.Follower
 	cd         *cluster.ClusterDaemon
+	profiling  bool
 }
 
 var engine *server
@@ -32,6 +35,12 @@ func createDaemon(app *application.Follower, cd *cluster.ClusterDaemon, ipAddr s
 	}
 
 	m := http.NewServeMux()
+
+	httpServer := http.Server{
+		Handler: m,
+	}
+
+	s := &server{&httpServer, socket, app, cd, false}
 	m.HandleFunc("/ping", ping)
 
 	m.HandleFunc("/registerNode", registerNode)
@@ -94,10 +103,10 @@ func createDaemon(app *application.Follower, cd *cluster.ClusterDaemon, ipAddr s
 
 	m.HandleFunc("/registerClusterNode", cd.RegisterClusterNode)
 
-	httpServer := http.Server{
-		Handler: m,
-	}
-	return &server{&httpServer, socket, app, cd}
+	m.HandleFunc("/profile", s.profile)
+	m.HandleFunc("/stopProfile", s.stopProfile)
+
+	return s
 }
 
 func Serve() {
@@ -109,4 +118,25 @@ func Serve() {
 
 func ping(w http.ResponseWriter, r *http.Request) {
 	return
+}
+
+func (server *server) profile(w http.ResponseWriter, r *http.Request) {
+
+	if !server.profiling {
+		server.profiling = true
+		f, err := os.Create("/tmp/profiler.prof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+	}
+	return
+}
+
+func (server *server) stopProfile(w http.ResponseWriter, r *http.Request) {
+	if server.profiling {
+		server.profiling = false
+		pprof.StopCPUProfile()
+		return
+	}
 }

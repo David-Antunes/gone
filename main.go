@@ -103,12 +103,6 @@ func main() {
 		emulationLog.Println(err)
 	}
 
-	//f, err := os.Create("/tmp/profiler.prof")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//pprof.StartCPUProfile(f)
-
 	rttSocket, err := net.Dial("unix", viper.GetString("PROXY_RTT_SOCKET"))
 	if err != nil {
 		fmt.Println(err)

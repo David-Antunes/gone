@@ -141,8 +141,6 @@ func (shaper *NetworkShaper) receiveLatency() {
 			}
 			if len(shaper.queue) < internal.QueueSize {
 				shaper.queue <- frame
-				//} else {
-				//	fmt.Println("Queue Full!")
 			}
 		}
 	}
@@ -157,10 +155,8 @@ func (shaper *NetworkShaper) receiveNoLatency() {
 
 		case frame := <-shaper.incoming:
 			frame.Time = frame.Time.Add(-shaper.delay.Value)
-			if len(shaper.queue) < internal.ComponentQueueSize {
+			if len(shaper.queue) < internal.QueueSize {
 				shaper.queue <- frame
-				//} else {
-				//	fmt.Println("Queue Full!")
 			}
 		}
 	}
