@@ -474,8 +474,8 @@ func (app *Follower) connectRouterToRouterRemote(r1 *topology.Router, r2 *topolo
 		R2:        r1.ID(),
 		MachineID: r1.MachineId,
 		Latency:   linkProps.Latency * 2.0,
-		Jitter:    linkProps.Jitter,
-		DropRate:  linkProps.DropRate,
+		Jitter:    linkProps.Jitter * 2.0,
+		DropRate:  linkProps.DropRate * 2.0,
 		Bandwidth: linkProps.Bandwidth * 8,
 		Weight:    linkProps.Weight,
 	}
@@ -565,8 +565,8 @@ func (app *Follower) RedirectConnection(r1 *topology.Router, r2 *topology.Router
 		R2:        r2.ID(),
 		MachineID: r1.MachineId,
 		Latency:   linkProps.Latency * 2.0,
-		Jitter:    linkProps.Jitter,
-		DropRate:  linkProps.DropRate,
+		Jitter:    linkProps.Jitter * 2.0,
+		DropRate:  linkProps.DropRate * 2.0,
 		Bandwidth: linkProps.Bandwidth * 8,
 		Weight:    linkProps.Weight,
 	}

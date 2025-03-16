@@ -61,8 +61,8 @@ func ParseLinkProps(latency float64, bandwidth int, jitter float64, dropRate flo
 		Latency:   time.Duration(latency * float64(time.Millisecond) / 2.0),
 		FLatency:  latency,
 		Bandwidth: bandwidth / 8,
-		Jitter:    jitter,
-		DropRate:  dropRate,
+		Jitter:    jitter / 2,
+		DropRate:  dropRate / 2,
 		Weight:    weight,
 	}, nil
 }
@@ -83,8 +83,8 @@ func ParseLinkPropsInternal(latency time.Duration, bandwidth int, jitter float64
 		Latency:   latency / 2.0,
 		FLatency:  float64(latency),
 		Bandwidth: bandwidth / 8,
-		Jitter:    jitter,
-		DropRate:  dropRate,
+		Jitter:    jitter / 2.0,
+		DropRate:  dropRate / 2.0,
 		Weight:    weight,
 	}, nil
 
