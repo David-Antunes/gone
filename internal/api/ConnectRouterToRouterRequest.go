@@ -11,4 +11,5 @@ type ConnectRouterToRouterRequest struct {
 	DropRate  float64       `json:"dropRate"`
 	Bandwidth int           `json:"bandwidth"`
 	Weight    int           `json:"weight"`
+	Propagate bool          `json:"propagate"`
 }

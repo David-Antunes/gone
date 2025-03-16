@@ -426,7 +426,7 @@ func (app *Leader) ConnectBridgeToRouter(bridgeID string, routerID string, linkP
 	return nil
 }
 
-func (app *Leader) ConnectRouterToRouter(router1ID string, router2ID string, linkProps network.LinkProps) error {
+func (app *Leader) ConnectRouterToRouter(router1ID string, router2ID string, linkProps network.LinkProps, propagate bool) error {
 
 	if router1ID == router2ID {
 		return errors.New("can't connect a router to itself")
@@ -452,17 +452,20 @@ func (app *Leader) ConnectRouterToRouter(router1ID string, router2ID string, lin
 			}
 
 			graphDB.AddPath(router1ID, router2ID, l.ID(), linkProps.Weight)
-			app.PropagateNewRoutes(r1)
+			app.TradeRoutes(r1, r2)
+			if propagate {
+				app.PropagateNewRoutes(r1)
+			}
 			return nil
 		} else {
-			return app.connectRouterToRouterRemote(r1, r2, linkProps)
+			return app.connectRouterToRouterRemote(r1, r2, linkProps, propagate)
 		}
 	} else {
-		return app.RedirectConnection(r1, r2, linkProps)
+		return app.RedirectConnection(r1, r2, linkProps, propagate)
 	}
 }
 
-func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology.Router, linkProps network.LinkProps) error {
+func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology.Router, linkProps network.LinkProps, propagate bool) error {
 	app.topo.Lock()
 	if _, ok := r1.ConnectedRouters[r2.ID()]; ok {
 		return errors.New(r1.ID() + " is already connected to " + r2.ID())
@@ -511,6 +514,7 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 		DropRate:  linkProps.DropRate * 2.0,
 		Bandwidth: linkProps.Bandwidth * 8,
 		Weight:    linkProps.Weight,
+		Propagate: propagate,
 	}
 
 	app.topo.Unlock()
@@ -521,11 +525,15 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 	}
 
 	graphDB.AddPath(r1.ID(), r2.ID(), BiLink.ID(), linkProps.Weight)
-	app.PropagateNewRoutes(r1)
+
+	app.TradeRoutesRemote(r1, r2)
+	if propagate {
+		app.PropagateNewRoutes(r1)
+	}
 	return nil
 }
 
-func (app *Leader) ApplyConnectRouterToRouterRemote(router1ID string, router2ID string, machineId string, linkProps network.LinkProps) error {
+func (app *Leader) ApplyConnectRouterToRouterRemote(router1ID string, router2ID string, machineId string, linkProps network.LinkProps, propagate bool) error {
 
 	r1, ok := app.topo.GetRouter(router1ID)
 
@@ -579,11 +587,13 @@ func (app *Leader) ApplyConnectRouterToRouterRemote(router1ID string, router2ID 
 	toLink.SetShaper(s)
 	s.SetDelay(d)
 	toLink.Start()
-	app.PropagateNewRoutes(r1)
+	if propagate {
+		app.PropagateNewRoutes(r1)
+	}
 	return nil
 }
 
-func (app *Leader) RedirectConnection(r1 *topology.Router, r2 *topology.Router, linkProps network.LinkProps) error {
+func (app *Leader) RedirectConnection(r1 *topology.Router, r2 *topology.Router, linkProps network.LinkProps, propagate bool) error {
 
 	b := &internalApi.ConnectRouterToRouterRequest{
 		R1:        r1.ID(),
@@ -594,6 +604,7 @@ func (app *Leader) RedirectConnection(r1 *topology.Router, r2 *topology.Router, 
 		DropRate:  linkProps.DropRate * 2.0,
 		Bandwidth: linkProps.Bandwidth * 8,
 		Weight:    linkProps.Weight,
+		Propagate: propagate,
 	}
 	resp, err := app.cl.SendMsg(r1.MachineId, b, "connectRouterToRouter")
 	if err != nil {

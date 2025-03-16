@@ -296,7 +296,7 @@ func connectRouterToRouter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = engine.app.ConnectRouterToRouter(req.R1, req.R2, req.MachineID, linkProps)
+	err = engine.app.ConnectRouterToRouter(req.R1, req.R2, req.MachineID, linkProps, req.Propagate)
 
 	if err != nil {
 
@@ -355,7 +355,7 @@ func connectRouterToRouterRemote(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.MachineID != engine.app.GetMachineId() {
-		err := engine.app.ApplyConnectRouterToRouterRemote(req.R1, req.R2, req.MachineID, linkProps)
+		err := engine.app.ApplyConnectRouterToRouterRemote(req.R1, req.R2, req.MachineID, linkProps, req.Propagate)
 		if err != nil {
 
 			daemonLog.Println("connectRouterToRouterRemote:", err)
