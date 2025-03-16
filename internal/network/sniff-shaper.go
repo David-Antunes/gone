@@ -140,9 +140,9 @@ func (shaper *SniffShaper) receive() {
 			frame.Time = frame.Time.Add(shaper.props.Latency)
 			frame.Time = frame.Time.Add(shaper.props.PollJitter())
 			frame.Time = frame.Time.Add(-shaper.delay.Value)
-			if len(shaper.queue) < internal.QueueSize {
-				shaper.queue <- frame
-			}
+			//if len(shaper.queue) < internal.QueueSize {
+			shaper.queue <- frame
+			//}
 		}
 	}
 }
@@ -162,17 +162,17 @@ func (shaper *SniffShaper) send() {
 					fmt.Println("Something went wrong")
 				}
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + internal.PacketSize
-				time.Sleep(r.Delay())
+				frame.Time = frame.Time.Add(r.Delay())
 			} else {
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize
 			}
 
-			go func() {
-				time.Sleep(time.Until(frame.Time))
-				if len(shaper.outgoing) < internal.QueueSize {
-					shaper.outgoing <- frame
-				}
-			}()
+			//go func() {
+			time.Sleep(time.Until(frame.Time))
+			if len(shaper.outgoing) < internal.ComponentQueueSize {
+				shaper.outgoing <- frame
+			}
+			//}(/**/)
 		}
 	}
 }

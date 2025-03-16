@@ -105,11 +105,11 @@ func (bridge *Bridge) receive() {
 			return
 
 		case frame := <-bridge.incomingChannel:
-			if len(bridge.queue) < internal.QueueSize {
-				bridge.queue <- frame
-				//} else {
-				//	fmt.Println("Queue Full!")
-			}
+			//if len(bridge.queue) < internal.QueueSize {
+			bridge.queue <- frame
+			//} else {
+			//	fmt.Println("Queue Full!")
+			//}
 		}
 	}
 }
@@ -173,10 +173,8 @@ func (bridge *Bridge) send() {
 				continue
 			}
 			bridge.RLock()
-			if channel, ok := bridge.channels[frame.GetMacDestination()]; ok {
-				if len(channel) < internal.QueueSize {
-					channel <- frame
-				}
+			if channel, ok := bridge.channels[frame.GetMacDestination()]; ok && len(channel) < internal.QueueSize {
+				channel <- frame
 			} else {
 				if len(bridge.gateway) < internal.QueueSize {
 					bridge.gateway <- frame

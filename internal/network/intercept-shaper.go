@@ -142,9 +142,9 @@ func (shaper *InterceptShaper) receive() {
 			if shaper.props.PollDropRate() {
 				continue
 			}
-			if len(shaper.queue) < internal.QueueSize {
-				shaper.queue <- frame
-			}
+			//if len(shaper.queue) < internal.QueueSize {
+			shaper.queue <- frame
+			//}
 		}
 	}
 }
@@ -165,17 +165,17 @@ func (shaper *InterceptShaper) send() {
 				}
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + internal.PacketSize
 
-				time.Sleep(r.Delay())
+				frame.Time = frame.Time.Add(r.Delay())
 			} else {
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize
 			}
 
-			go func() {
-				time.Sleep(time.Until(frame.Time))
-				if len(shaper.outgoing) < internal.ComponentQueueSize {
-					shaper.outgoing <- frame
-				}
-			}()
+			//go func() {
+			time.Sleep(time.Until(frame.Time))
+			if len(shaper.outgoing) < internal.ComponentQueueSize {
+				shaper.outgoing <- frame
+			}
+			//}()
 
 		}
 	}

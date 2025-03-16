@@ -9,8 +9,8 @@ import (
 
 const RemoteQueueSize = 10000
 
-const QueueSize = 50000
-const ComponentQueueSize = 100000
+const QueueSize = 5000
+const ComponentQueueSize = 10000
 const PacketSize = 1500
 
 const ProxyQueueSize = 100000

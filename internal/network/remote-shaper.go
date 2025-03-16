@@ -90,9 +90,9 @@ func (shaper *RemoteShaper) receive() {
 			if shaper.props.PollDropRate() {
 				continue
 			}
-			if len(shaper.queue) < internal.QueueSize {
-				shaper.queue <- frame
-			}
+			//if len(shaper.queue) < internal.QueueSize {
+			shaper.queue <- frame
+			//}
 		}
 	}
 }
@@ -112,20 +112,20 @@ func (shaper *RemoteShaper) send() {
 					fmt.Println("Something went wrong")
 				}
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize + internal.PacketSize
-				time.Sleep(r.Delay())
+				frame.Time = frame.Time.Add(r.Delay())
 			} else {
 				shaper.tokenSize = shaper.tokenSize - frame.FrameSize
 			}
-			go func() {
-				time.Sleep(time.Until(frame.Time))
-				if len(shaper.outgoing) < internal.RemoteQueueSize {
-					shaper.outgoing <- &RouterFrame{
-						To:    shaper.To,
-						From:  shaper.From,
-						Frame: frame,
-					}
+			//go func() {
+			time.Sleep(time.Until(frame.Time))
+			if len(shaper.outgoing) < internal.RemoteQueueSize {
+				shaper.outgoing <- &RouterFrame{
+					To:    shaper.To,
+					From:  shaper.From,
+					Frame: frame,
 				}
-			}()
+			}
+			//}()
 		}
 	}
 }

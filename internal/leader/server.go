@@ -134,6 +134,7 @@ func (server *server) profile(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 		}
 		pprof.StartCPUProfile(f)
+		fmt.Println("Profiling")
 	}
 }
 
@@ -141,6 +142,7 @@ func (server *server) stopProfile(w http.ResponseWriter, r *http.Request) {
 	if server.profiling {
 		server.profiling = false
 		pprof.StopCPUProfile()
+		fmt.Println("Stopped Profiling")
 		return
 	}
 }

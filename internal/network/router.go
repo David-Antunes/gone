@@ -98,11 +98,11 @@ func (router *Router) receive() {
 			return
 
 		case frame := <-router.incomingChannel:
-			if len(router.queue) < internal.QueueSize {
-				router.queue <- frame
-				//} else {
-				//	fmt.Println(router.id, "Queue Full!")
-			}
+			//if len(router.queue) < internal.ComponentQueueSize {
+			router.queue <- frame
+			//} else {
+			//	fmt.Println(router.id, "Queue Full!")
+			//}
 		}
 	}
 }
@@ -114,10 +114,8 @@ func (router *Router) send() {
 			return
 		case frame := <-router.queue:
 			router.RLock()
-			if channel, ok := router.channels[frame.GetMacDestination()]; ok {
-				if len(channel) < internal.QueueSize {
-					channel <- frame
-				}
+			if channel, ok := router.channels[frame.GetMacDestination()]; ok && len(channel) < internal.QueueSize {
+				channel <- frame
 				router.RUnlock()
 			} else {
 				router.RUnlock()
@@ -129,10 +127,8 @@ func (router *Router) send() {
 
 func (router *Router) InjectFrame(frame *xdp.Frame) {
 	router.RLock()
-	if channel, ok := router.channels[frame.GetMacDestination()]; ok {
-		if len(channel) < internal.QueueSize {
-			channel <- frame
-		}
+	if channel, ok := router.channels[frame.GetMacDestination()]; ok && len(channel) < internal.QueueSize {
+		channel <- frame
 		router.RUnlock()
 	} else {
 		router.RUnlock()
