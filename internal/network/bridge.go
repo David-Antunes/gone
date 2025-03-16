@@ -28,7 +28,7 @@ func CreateBridge() *Bridge {
 		gateway:         nil,
 		link:            nil,
 		running:         false,
-		queue:           make(chan *xdp.Frame, internal.QueueSize),
+		queue:           make(chan *xdp.Frame, internal.ComponentQueueSize),
 		ctx:             make(chan struct{}, 2),
 		disrupted: disruptLogic{
 			disrupted: false,

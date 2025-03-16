@@ -9,11 +9,11 @@ import (
 
 const RemoteQueueSize = 10000
 
-const QueueSize = 5000
-const ComponentQueueSize = 10000
+const QueueSize = 50000
+const ComponentQueueSize = 100000
 const PacketSize = 1500
 
-const ProxyQueueSize = 10000
+const ProxyQueueSize = 100000
 
 var nullChan = make(chan *xdp.Frame, QueueSize)
 

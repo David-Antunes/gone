@@ -27,7 +27,7 @@ func CreateRouter(id string) *Router {
 		channels:        make(map[string]chan *xdp.Frame),
 		incomingChannel: make(chan *xdp.Frame, internal.ComponentQueueSize),
 		running:         false,
-		queue:           make(chan *xdp.Frame, internal.QueueSize),
+		queue:           make(chan *xdp.Frame, internal.ComponentQueueSize),
 		ctx:             make(chan struct{}, 2),
 		disrupted: disruptLogic{
 			disrupted: false,

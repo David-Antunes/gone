@@ -109,7 +109,7 @@ func createDaemon(app *application.Leader, cd *cluster.ClusterDaemon, ipAddr str
 
 	m.HandleFunc("/registerMachine", cd.RegisterMachine)
 	m.HandleFunc("/profile", s.profile)
-	m.HandleFunc("/stopProfile", s.profile)
+	m.HandleFunc("/stopProfile", s.stopProfile)
 
 	return s
 }
