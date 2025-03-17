@@ -21,6 +21,8 @@ func GetNullChan() chan *xdp.Frame {
 	return nullChan
 }
 
+var LocalQuery = false
+
 func ClearNullChan() {
 	for {
 		for range nullChan {

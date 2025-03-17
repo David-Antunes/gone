@@ -2,6 +2,7 @@ package leader
 
 import (
 	"fmt"
+	"github.com/David-Antunes/gone/internal"
 	"github.com/David-Antunes/gone/internal/application"
 	"github.com/David-Antunes/gone/internal/cluster"
 	"log"
@@ -110,6 +111,7 @@ func createDaemon(app *application.Leader, cd *cluster.ClusterDaemon, ipAddr str
 	m.HandleFunc("/registerMachine", cd.RegisterMachine)
 	m.HandleFunc("/profile", s.profile)
 	m.HandleFunc("/stopProfile", s.stopProfile)
+	m.HandleFunc("/localQuery", localQuery)
 
 	return s
 }
@@ -144,5 +146,16 @@ func (server *server) stopProfile(w http.ResponseWriter, r *http.Request) {
 		pprof.StopCPUProfile()
 		fmt.Println("Stopped Profiling")
 		return
+	}
+}
+
+func localQuery(w http.ResponseWriter, r *http.Request) {
+
+	internal.LocalQuery = !internal.LocalQuery
+
+	if internal.LocalQuery {
+		fmt.Println("Turned on Local Query")
+	} else {
+		fmt.Println("Turned off Local Query")
 	}
 }

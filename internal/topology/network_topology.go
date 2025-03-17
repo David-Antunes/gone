@@ -6,8 +6,10 @@ import (
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"github.com/David-Antunes/gone/internal"
 	"github.com/David-Antunes/gone/internal/network"
+	"net"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type LocalFlowManager interface {
@@ -365,6 +367,7 @@ func (topo *Topology) ConnectRouterToRouterLocal(router1 string, router2 string,
 
 	return link, nil
 }
+
 func (topo *Topology) InsertNewPath(path []string, frame *xdp.Frame, distance int) {
 	topo.Lock()
 	defer topo.Unlock()
@@ -383,6 +386,41 @@ func (topo *Topology) InsertNewPath(path []string, frame *xdp.Frame, distance in
 		}
 		router1 = router2
 	}
+}
+
+func (topo *Topology) InsertLocalPath(path []string, frame *xdp.Frame, distance int) {
+	topo.Lock()
+	defer topo.Unlock()
+	currDistance := distance
+	router1 := topo.routers[path[0]]
+	router2 := topo.routers[path[1]]
+	if router1.MachineId == topo.machineId {
+		currDistance = AddNewMacBetweenRouters(router1, router2, frame.GetMacDestination(), currDistance)
+		if currDistance < 0 {
+			fmt.Println("weight is negative!!!")
+		}
+	}
+}
+
+func (topo *Topology) InsertNullPath(mac string, routerId string) {
+	topo.Lock()
+
+	router := topo.routers[routerId]
+	if router == nil {
+		return
+	}
+	router.NetworkRouter.AddNode([]byte(mac), internal.GetNullChan())
+	topo.Unlock()
+
+	go func(m string, rId string) {
+		fmt.Println("Inserting null path for 10 seconds", net.HardwareAddr(m), rId)
+		time.Sleep(10 * time.Second)
+		topo.Lock()
+		r := topo.routers[rId]
+		r.NetworkRouter.RemoveNode([]byte(m))
+		fmt.Println("Removed", net.HardwareAddr(m), rId)
+		topo.Unlock()
+	}(mac, routerId)
 }
 
 func (topo *Topology) RemoveNode(nodeId string) (*Node, error) {

@@ -174,14 +174,20 @@ func (app *Leader) HandleNewMac(frame *xdp.Frame, routerId string) {
 	r, _ := app.topo.GetRouter(routerId)
 
 	path, distance := graphDB.FindPathToRouter(routerId, dest)
-	fmt.Println(routerId, ":", net.HardwareAddr(dest), ":", path)
 
 	if len(path) > 0 {
 		if net.HardwareAddr(dest).String() == path[len(path)-1] {
-			path = path[:len(path)-1]
+			if internal.LocalQuery {
+				fmt.Println(routerId, ":", net.HardwareAddr(dest), ":", path[:2])
+				app.topo.InsertLocalPath(path[:2], frame, distance)
+			} else {
+				fmt.Println(routerId, ":", net.HardwareAddr(dest), ":", path)
+				app.topo.InsertNewPath(path[:len(path)-1], frame, distance)
+			}
+			r.NetworkRouter.InjectFrame(frame)
 		}
-		app.topo.InsertNewPath(path, frame, distance)
-		r.NetworkRouter.InjectFrame(frame)
+	} else {
+		app.topo.InsertNullPath(frame.MacDestination, routerId)
 	}
 }
 

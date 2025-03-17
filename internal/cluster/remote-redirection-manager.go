@@ -112,15 +112,16 @@ func (icm *InterCommunicationManager) receiveFrames() {
 			return
 		case frame := <-icm.inQueue:
 			//icm.Lock()
+			icm.RLock()
 			if router, ok := icm.routers[frame.To]; ok {
 				//frame.Frame.Time = time.Now()
 				//frame.Frame.Time = time.Now().Add(-icm.delays[frame.From].Value)
+				//frame.Frame.Time = frame.Frame.Time.Add(-icm.delays[frame.From].Value)
 				router.InjectFrame(frame.Frame)
 			} else {
 				fmt.Println("No router for ", frame.To)
 			}
-
-			//icm.Unlock()
+			icm.Unlock()
 		}
 	}
 }

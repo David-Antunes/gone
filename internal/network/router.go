@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"github.com/David-Antunes/gone/internal"
 	"github.com/David-Antunes/gone/internal/network/routing"
@@ -132,7 +133,8 @@ func (router *Router) InjectFrame(frame *xdp.Frame) {
 		router.RUnlock()
 	} else {
 		router.RUnlock()
-		routing.HandleNewMac(frame, router.id)
+		fmt.Println("Failed to inject Frame")
+		//routing.HandleNewMac(frame, router.id)
 	}
 }
 
