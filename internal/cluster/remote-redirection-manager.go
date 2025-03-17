@@ -121,7 +121,7 @@ func (icm *InterCommunicationManager) receiveFrames() {
 			} else {
 				fmt.Println("No router for ", frame.To)
 			}
-			icm.Unlock()
+			icm.RUnlock()
 		}
 	}
 }
