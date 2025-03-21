@@ -15,6 +15,7 @@ func AddNewMacBetweenRouters(src *Router, dest *Router, mac string, weight int) 
 		src.Weights[mac] = Weight{Router: dest.ID(), Weight: weight}
 		src.NetworkRouter.AddNode([]byte(mac), GetOriginChanFromLink(src.ID(), biLink))
 	}
+	//fmt.Println("Operation", src.Id, dest.Id, net.HardwareAddr(mac))
 	return weight - biLink.ConnectsTo.NetworkLink.GetProps().Weight
 }
 

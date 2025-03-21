@@ -172,8 +172,7 @@ func (app *Leader) HandleNewMac(frame *xdp.Frame, routerId string) {
 	dest := frame.MacDestination
 
 	r, _ := app.topo.GetRouter(routerId)
-
-	path, distance := graphDB.FindPathToRouter(routerId, dest)
+	path, distance := graphDB.FindPathToRouter(routerId, net.HardwareAddr(dest).String())
 
 	if len(path) > 0 {
 		if net.HardwareAddr(dest).String() == path[len(path)-1] {
@@ -535,13 +534,20 @@ func (app *Leader) connectRouterToRouterRemote(r1 *topology.Router, r2 *topology
 	app.TradeRoutesRemote(r1, r2)
 	if propagate {
 		app.PropagateNewRoutes(r1)
+
+		_, err := app.cl.SendMsg(r2.MachineId, opApi.PropagateRequest{Name: r2.ID()}, "propagate")
+		if err != nil {
+			return errors.New("couldn't contact machine")
+		}
 	}
 	return nil
 }
 
 func (app *Leader) ApplyConnectRouterToRouterRemote(router1ID string, router2ID string, machineId string, linkProps network.LinkProps, propagate bool) error {
 
+	app.topo.Lock()
 	r1, ok := app.topo.GetRouter(router1ID)
+	app.topo.Unlock()
 
 	if !ok {
 		return errors.New("router not found")
@@ -550,8 +556,9 @@ func (app *Leader) ApplyConnectRouterToRouterRemote(router1ID string, router2ID 
 	if _, ok = r1.ConnectedRouters[router2ID]; ok {
 		return errors.New("router already connected")
 	}
-
+	app.topo.Lock()
 	r2, ok := app.topo.GetRouter(router2ID)
+	app.topo.Unlock()
 
 	if !ok {
 		_, err := app.AddRouter(machineId, router2ID)
@@ -593,9 +600,9 @@ func (app *Leader) ApplyConnectRouterToRouterRemote(router1ID string, router2ID 
 	toLink.SetShaper(s)
 	s.SetDelay(d)
 	toLink.Start()
-	if propagate {
-		app.PropagateNewRoutes(r1)
-	}
+	//if propagate {
+	//	app.PropagateNewRoutes(r1)
+	//}
 	return nil
 }
 
@@ -673,6 +680,11 @@ func (app *Leader) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 
 	for mac, weight := range r1.Weights {
 
+		//fmt.Println(r1.ID(), mac)
+		if len(net.HardwareAddr(mac)) != 6 {
+			continue
+		}
+
 		if existingWeight, ok := r2.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
 			r2.Weights[mac] = topology.Weight{Router: r1.ID(), Weight: newWeight + weight.Weight}
 			r2.NetworkRouter.AddNode([]byte(mac), topology.GetOriginChanFromLink(r2.ID(), biLink))
@@ -685,6 +697,11 @@ func (app *Leader) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 	}
 
 	for mac, weight := range r2.Weights {
+
+		//fmt.Println(r2.ID(), mac)
+		if len(net.HardwareAddr(mac)) != 6 {
+			continue
+		}
 
 		if existingWeight, ok := r1.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
 			r1.Weights[mac] = topology.Weight{Router: r2.ID(), Weight: newWeight + weight.Weight}
@@ -721,6 +738,13 @@ func (app *Leader) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router) e
 
 	for mac, weight := range req.Weights {
 
+		//fmt.Println("tradeRemote", r2.ID(), mac)
+
+		if len(net.HardwareAddr(mac)) != 6 {
+			continue
+		}
+		//fmt.Println(r1.ID(), net.HardwareAddr(mac), weight)
+
 		if existingWeight, ok := r1.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
 			r1.Weights[mac] = topology.Weight{Router: r2.ID(), Weight: newWeight + weight.Weight}
 			r1.NetworkRouter.AddNode([]byte(mac), biLink.ConnectsTo.NetworkLink.GetOriginChan())
@@ -731,7 +755,6 @@ func (app *Leader) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router) e
 			fmt.Println(r1.ID(), "added weight of", net.HardwareAddr(mac), "from", r2.ID(), "with weight", newWeight+weight.Weight)
 		}
 	}
-	app.topo.Unlock()
 
 	body := &internalApi.TradeRoutesRequest{
 		To:      r2.ID(),
@@ -744,6 +767,8 @@ func (app *Leader) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router) e
 		return errors.New("couldn't contact machine")
 	}
 
+	app.topo.Unlock()
+
 	d = json.NewDecoder(resp.Body)
 	tradeReq := &internalApi.TradeRoutesResponse{}
 	err = d.Decode(&tradeReq)
@@ -755,15 +780,21 @@ func (app *Leader) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router) e
 }
 
 func (app *Leader) ApplyRoutes(to string, from string, weights map[string]topology.Weight) {
+	app.topo.Lock()
 	r, ok := app.topo.GetRouter(to)
 
 	if !ok {
 		return
 	}
-	app.topo.Lock()
 	biLink := r.RouterLinks[from]
 	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 	for mac, weight := range weights {
+
+		//fmt.Println("ApplyTrade", from, mac)
+
+		if len(net.HardwareAddr(mac)) != 6 {
+			continue
+		}
 
 		if existingWeight, ok := r.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
 			r.Weights[mac] = topology.Weight{Router: from, Weight: newWeight + weight.Weight}

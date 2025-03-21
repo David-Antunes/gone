@@ -5,6 +5,7 @@ import (
 	"github.com/David-Antunes/gone-proxy/xdp"
 	"github.com/David-Antunes/gone/internal"
 	"github.com/David-Antunes/gone/internal/network/routing"
+	"net"
 	"sync"
 	"time"
 )
@@ -55,6 +56,9 @@ func (router *Router) GetMacs() [][]byte {
 
 func (router *Router) AddNode(mac []byte, channel chan *xdp.Frame) {
 	router.Lock()
+	if len(mac) != 6 {
+		fmt.Println(router.id, "AddNode: invalid mac")
+	}
 	router.channels[string(mac)] = channel
 	router.Unlock()
 }
@@ -77,6 +81,7 @@ func (router *Router) HasMac(mac []byte) bool {
 func (router *Router) ClearRoutes() {
 	router.Lock()
 	router.channels = make(map[string]chan *xdp.Frame)
+	fmt.Println("New Size:", len(router.channels))
 	router.Unlock()
 }
 
@@ -115,8 +120,10 @@ func (router *Router) send() {
 			return
 		case frame := <-router.queue:
 			router.RLock()
-			if channel, ok := router.channels[frame.GetMacDestination()]; ok && len(channel) < internal.QueueSize {
-				channel <- frame
+			if channel, ok := router.channels[frame.GetMacDestination()]; ok {
+				if len(channel) < internal.QueueSize {
+					channel <- frame
+				}
 				router.RUnlock()
 			} else {
 				router.RUnlock()
@@ -128,13 +135,24 @@ func (router *Router) send() {
 
 func (router *Router) InjectFrame(frame *xdp.Frame) {
 	router.RLock()
+	defer router.RUnlock()
 	if channel, ok := router.channels[frame.GetMacDestination()]; ok && len(channel) < internal.QueueSize {
 		channel <- frame
+	} else {
+		fmt.Println("Failed to inject Frame", router.id, net.HardwareAddr(frame.MacDestination))
+	}
+}
+
+func (router *Router) RemoteInjectFrame(frame *xdp.Frame) {
+	router.RLock()
+	if channel, ok := router.channels[frame.GetMacDestination()]; ok {
+		if len(channel) < internal.QueueSize {
+			channel <- frame
+		}
 		router.RUnlock()
 	} else {
 		router.RUnlock()
-		fmt.Println("Failed to inject Frame")
-		//routing.HandleNewMac(frame, router.id)
+		routing.HandleNewMac(frame, router.id)
 	}
 }
 

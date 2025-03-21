@@ -3,7 +3,9 @@ package graphDB
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -15,6 +17,7 @@ type dbConn struct {
 	conn           neo4j.DriverWithContext
 	ctx            context.Context
 	connectedNodes map[string]string
+	sync.Mutex
 }
 
 var conn *dbConn
@@ -35,7 +38,7 @@ func StartConnection(uri string, user string, password string) {
 		panic(err)
 	}
 
-	conn = &dbConn{uri, user, password, driver, ctx, make(map[string]string)}
+	conn = &dbConn{uri, user, password, driver, ctx, make(map[string]string), sync.Mutex{}}
 	err = prepareDatabase()
 	if err != nil {
 		panic(err)
@@ -58,7 +61,7 @@ func prepareDatabase() error {
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	_, err = neo4j.ExecuteQuery(conn.ctx, conn.conn,
@@ -70,7 +73,7 @@ func prepareDatabase() error {
 		neo4j.ExecuteQueryWithDatabase("neo4j"))
 
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	return nil
@@ -81,6 +84,7 @@ func AddNode(macAddr string, routerId string) error {
 	_, ok := conn.connectedNodes[net.HardwareAddr(macAddr).String()]
 
 	if !ok {
+		conn.Lock()
 		conn.connectedNodes[net.HardwareAddr(macAddr).String()] = routerId
 
 		_, err := query("CREATE (n:Node {id: $id})",
@@ -89,45 +93,56 @@ func AddNode(macAddr string, routerId string) error {
 			})
 
 		if err != nil {
+			fmt.Println(err)
 			return err
 		}
+		conn.Unlock()
 		return AddPath(net.HardwareAddr(macAddr).String(), routerId, net.HardwareAddr(macAddr).String(), 0)
 	}
 	return errors.New("node already exists")
 }
 
 func RemoveNode(id string) error {
+	conn.Lock()
+	defer conn.Unlock()
 	delete(conn.connectedNodes, net.HardwareAddr(id).String())
 	_, err := query(`MATCH (n:Node {id: $id}) DETACH DELETE n`,
 		map[string]any{
 			"id": net.HardwareAddr(id).String(),
 		})
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 	return nil
 }
 
 func AddRouter(id string) error {
+	conn.Lock()
+	defer conn.Unlock()
 	_, err := query("CREATE (n:Node {id: $id})",
 		map[string]any{
 			"id": id,
 		})
 
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 	return nil
 }
 
 func RemoveRouter(id string) {
+	conn.Lock()
+	defer conn.Unlock()
 	_, err := query("MATCH (n:Node {id: $id}) DETACH DELETE n",
 		map[string]any{
 			"id": id,
 		})
 
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 	nodes := make([]string, 0, len(conn.connectedNodes))
 	for macAddr, routerId := range conn.connectedNodes {
@@ -178,7 +193,7 @@ func RemoveRouter(id string) {
 //}
 
 func FindPathToRouter(src string, dest string) ([]string, int) {
-
+	//fmt.Println("FindPathToRouter src:", src, "dest:", dest)
 	if src == dest {
 		return []string{src}, 0
 	}
@@ -190,10 +205,11 @@ func FindPathToRouter(src string, dest string) ([]string, int) {
 		LIMIT 1`,
 		map[string]any{
 			"src":  src,
-			"dest": net.HardwareAddr(dest).String(),
+			"dest": dest,
 		})
 
 	if err != nil {
+		fmt.Println(err)
 		return make([]string, 0), 0
 	}
 
@@ -210,7 +226,6 @@ func FindPathToRouter(src string, dest string) ([]string, int) {
 }
 
 func AddPath(from string, to string, id string, weight int) error {
-
 	_, err := query(
 		`MATCH (n:Node {id: $from})
 		MATCH (m:Node {id: $to}) 
@@ -223,13 +238,13 @@ func AddPath(from string, to string, id string, weight int) error {
 		})
 
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 	return nil
 }
 
 func RemovePath(router1 string, router2 string) error {
-
 	_, err := query(
 		`MATCH (:Node {id: $router1})-[c:COSTS]-(:Node {id: $router2})
 		DELETE c`,
@@ -239,6 +254,7 @@ func RemovePath(router1 string, router2 string) error {
 		})
 
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 	return nil

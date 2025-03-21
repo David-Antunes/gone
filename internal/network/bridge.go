@@ -156,7 +156,6 @@ func (bridge *Bridge) StopDisrupt() bool {
 func (bridge *Bridge) send() {
 
 	for {
-
 		select {
 		case <-bridge.ctx:
 			return

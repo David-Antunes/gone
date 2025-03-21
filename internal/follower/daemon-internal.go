@@ -161,7 +161,7 @@ func trade(w http.ResponseWriter, r *http.Request) {
 	req := &api.TradeRoutesRequest{}
 
 	if err := daemon.ParseRequest(r, req); err != nil {
-		fmt.Println("Invalid fields in connectRouterToRouter request.")
+		fmt.Println("Invalid fields in trade request.")
 		daemon.SendError(w, &api.TradeRoutesResponse{
 			To:   "",
 			From: "",
@@ -179,6 +179,7 @@ func trade(w http.ResponseWriter, r *http.Request) {
 		From:  req.From,
 		Error: apiErrors.Error{},
 	})
+	daemonLog.Println("trade:", req.To, req.From)
 }
 
 func routerWeights(w http.ResponseWriter, r *http.Request) {
@@ -186,7 +187,7 @@ func routerWeights(w http.ResponseWriter, r *http.Request) {
 	req := &api.GetRouterWeightsRequest{}
 
 	if err := daemon.ParseRequest(r, req); err != nil {
-		fmt.Println("Invalid fields in connectRouterToRouter request.")
+		fmt.Println("Invalid fields in getWeights request.")
 		daemon.SendError(w, &api.GetRouterWeightsResponse{
 			Weights: nil,
 			Error: apiErrors.Error{
@@ -202,6 +203,7 @@ func routerWeights(w http.ResponseWriter, r *http.Request) {
 		Weights: weights,
 		Error:   apiErrors.Error{},
 	})
+	daemonLog.Println("weights:", req.Router)
 }
 func sniffNode(w http.ResponseWriter, r *http.Request) {
 

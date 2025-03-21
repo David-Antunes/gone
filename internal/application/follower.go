@@ -173,8 +173,7 @@ func (app *Follower) HandleNewMac(frame *xdp.Frame, routerId string) {
 	dest := frame.MacDestination
 
 	r, _ := app.topo.GetRouter(routerId)
-
-	path, distance := graphDB.FindPathToRouter(routerId, dest)
+	path, distance := graphDB.FindPathToRouter(routerId, net.HardwareAddr(dest).String())
 
 	if len(path) > 0 {
 		if net.HardwareAddr(dest).String() == path[len(path)-1] {
@@ -496,10 +495,17 @@ func (app *Follower) connectRouterToRouterRemote(r1 *topology.Router, r2 *topolo
 	}
 
 	graphDB.AddPath(r1.ID(), r2.ID(), BiLink.ID(), linkProps.Weight)
+
 	app.TradeRoutesRemote(r1, r2)
 	if propagate {
 		app.PropagateNewRoutes(r1)
+
+		_, err := app.cl.SendMsg(r2.MachineId, opApi.PropagateRequest{Name: r2.ID()}, "propagate")
+		if err != nil {
+			return errors.New("couldn't contact machine")
+		}
 	}
+
 	return nil
 }
 
@@ -565,9 +571,9 @@ func (app *Follower) ApplyConnectRouterToRouterRemote(router1ID string, router2I
 	toLink.SetShaper(s)
 	s.SetDelay(d)
 	toLink.Start()
-	if propagate {
-		app.PropagateNewRoutes(r1)
-	}
+	//if propagate {
+	//	app.PropagateNewRoutes(r1)
+	//}
 	return nil
 }
 
@@ -608,6 +614,12 @@ func (app *Follower) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 
 	for mac, weight := range r1.Weights {
 
+		//fmt.Println("Trade", r1.ID(), mac)
+
+		if len(net.HardwareAddr(mac)) != 6 {
+			continue
+		}
+
 		if existingWeight, ok := r2.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
 			r2.Weights[mac] = topology.Weight{Router: r1.ID(), Weight: newWeight + weight.Weight}
 			r2.NetworkRouter.AddNode([]byte(mac), topology.GetOriginChanFromLink(r2.ID(), biLink))
@@ -620,6 +632,12 @@ func (app *Follower) TradeRoutes(r1 *topology.Router, r2 *topology.Router) {
 	}
 
 	for mac, weight := range r2.Weights {
+
+		//fmt.Println("Trade", r2.ID(), mac)
+
+		if len(net.HardwareAddr(mac)) != 6 {
+			continue
+		}
 
 		if existingWeight, ok := r1.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
 			r1.Weights[mac] = topology.Weight{Router: r2.ID(), Weight: newWeight + weight.Weight}
@@ -656,6 +674,12 @@ func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router)
 
 	for mac, weight := range req.Weights {
 
+		//fmt.Println("TradeRemote", r2.ID(), mac)
+
+		if len(net.HardwareAddr(mac)) != 6 {
+			continue
+		}
+
 		if existingWeight, ok := r1.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
 			r1.Weights[mac] = topology.Weight{Router: r2.ID(), Weight: newWeight + weight.Weight}
 			r1.NetworkRouter.AddNode([]byte(mac), biLink.ConnectsTo.NetworkLink.GetOriginChan())
@@ -690,17 +714,22 @@ func (app *Follower) TradeRoutesRemote(r1 *topology.Router, r2 *topology.Router)
 }
 
 func (app *Follower) ApplyRoutes(to string, from string, weights map[string]topology.Weight) {
-
+	app.topo.Lock()
 	r, ok := app.topo.GetRouter(to)
 
 	if !ok {
 		return
 	}
 
-	app.topo.Lock()
 	biLink := r.RouterLinks[from]
 	newWeight := biLink.ConnectsTo.NetworkLink.GetProps().Weight
 	for mac, weight := range weights {
+
+		//fmt.Println("Apply", from, mac)
+
+		if len(net.HardwareAddr(mac)) != 6 {
+			continue
+		}
 
 		if existingWeight, ok := r.Weights[mac]; ok && newWeight+weight.Weight < existingWeight.Weight {
 			r.Weights[mac] = topology.Weight{Router: from, Weight: newWeight + weight.Weight}

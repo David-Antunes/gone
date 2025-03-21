@@ -31,6 +31,10 @@ func ClearNullChan() {
 	}
 }
 
+func init() {
+	go ClearNullChan()
+}
+
 var BroadcastAddr = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 
 func ConvertMacStringToBytes(macAddr string) []byte {
