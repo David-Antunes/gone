@@ -168,7 +168,7 @@ gone-cli unpause client
 
 To stop the entire system you can execute:
 ```bash
-./start.sh -C -n gone_net
+./start.sh -C -N $(hostname) -n gone_net
 ```
 
 If you plan on deploying other networks you can restart by executing the previous command:
@@ -247,7 +247,7 @@ GONE provides the following API endpoints:
 
 "/inspectNode"
 "/inspectBridge"
-##"/inspectRouter"
+"/inspectRouter"
 
 "/removeNode"
 "/removeBridge"
@@ -301,6 +301,7 @@ The user can change the behavior of the network emulator by altering the availab
 GRAPHDB=localhost
 GRAPHDB_PASSWORD=
 GRAPHDB_USER=
+GRAPH_COST=10000000
 ID=gone
 NETWORK_NAMESPACE=gone_net
 NUM_TESTS=1000

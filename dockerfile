@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/golang:1.23 AS build
+FROM golang:1.23 AS build
 
 WORKDIR /gone
 
