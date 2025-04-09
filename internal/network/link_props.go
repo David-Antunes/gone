@@ -16,9 +16,14 @@ type LinkProps struct {
 
 func (props *LinkProps) PollJitter() time.Duration {
 	if props.Jitter == 0 {
-		return 0
+		return props.Latency
 	} else {
-		return time.Duration((rand.NormFloat64() * props.Jitter) / 3 * float64(time.Millisecond))
+		random := rand.NormFloat64()
+		results := (random * float64(props.Latency)) + float64(time.Duration(props.Jitter)*time.Millisecond)
+		duration := time.Duration(results)
+
+		//fmt.Println(random, results, duration)
+		return duration
 	}
 }
 func (props *LinkProps) PollDropRate() bool {

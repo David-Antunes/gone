@@ -132,8 +132,12 @@ func (shaper *NetworkShaper) receiveLatency() {
 
 		case frame := <-shaper.incoming:
 			//fmt.Println("before:", frame.Time)
-			frame.Time = frame.Time.Add(shaper.props.Latency)
-			frame.Time = frame.Time.Add(shaper.props.PollJitter())
+			//frame.Time = frame.Time.Add(shaper.props.Latency)
+			old := frame.Time
+			jitter := shaper.props.PollJitter()
+			frame.Time = frame.Time.Add(jitter)
+			fmt.Println(old, frame.Time, jitter)
+
 			frame.Time = frame.Time.Add(-shaper.delay.Value)
 			//fmt.Println("after:", frame.Time, shaper.props.Latency)
 			if shaper.props.PollDropRate() {

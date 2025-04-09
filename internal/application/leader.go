@@ -186,7 +186,8 @@ func (app *Leader) HandleNewMac(frame *xdp.Frame, routerId string) {
 			r.NetworkRouter.InjectFrame(frame)
 		}
 	} else {
-		app.topo.InsertNullPath(frame.MacDestination, routerId)
+		//app.topo.InsertNullPath(frame.MacDestination, routerId)
+		return
 	}
 }
 
@@ -2300,7 +2301,8 @@ func (app *Leader) DisruptBridge(id string) error {
 }
 
 func (app *Leader) DisruptRouters(router1Id string, router2Id string) error {
-
+	app.topo.Lock()
+	defer app.topo.Unlock()
 	if r1, ok := app.topo.GetRouter(router1Id); !ok {
 		return errors.New("invalid router id: " + router1Id)
 	} else if r2, ok := app.topo.GetRouter(router2Id); !ok {
@@ -2308,8 +2310,12 @@ func (app *Leader) DisruptRouters(router1Id string, router2Id string) error {
 	} else if !(r1.MachineId == r2.MachineId) {
 		return errors.New("could not disrupt connnection between remote routers")
 	} else if r1.MachineId == app.GetMachineId() {
-		if r1.RouterLinks[r2.ID()].NetworkBILink.Disrupt() {
-			return nil
+		if l, ok := r1.RouterLinks[r2.ID()]; ok {
+			if l.NetworkBILink.Disrupt() {
+				return nil
+			} else {
+				return errors.New("could not stop link")
+			}
 		} else {
 			return errors.New("could not disrupt link")
 		}

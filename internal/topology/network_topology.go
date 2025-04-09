@@ -414,7 +414,7 @@ func (topo *Topology) InsertNullPath(mac string, routerId string) {
 
 	go func(m string, rId string) {
 		fmt.Println("Inserting null path for 10 seconds", net.HardwareAddr(m), rId)
-		time.Sleep(10 * time.Second)
+		time.Sleep(1 * time.Second)
 		topo.Lock()
 		r := topo.routers[rId]
 		r.NetworkRouter.RemoveNode([]byte(m))

@@ -187,7 +187,8 @@ func (app *Follower) HandleNewMac(frame *xdp.Frame, routerId string) {
 			r.NetworkRouter.InjectFrame(frame)
 		}
 	} else {
-		app.topo.InsertNullPath(frame.MacDestination, routerId)
+		return
+		//app.topo.InsertNullPath(frame.MacDestination, routerId)
 	}
 }
 
@@ -2244,8 +2245,12 @@ func (app *Follower) StopDisruptRouters(router1Id string, router2Id string) erro
 	} else if !(r1.MachineId == r2.MachineId) {
 		return errors.New("could not stop disrupt connnection between remote routers")
 	} else if r1.MachineId == app.GetMachineId() {
-		if r1.RouterLinks[r2.ID()].NetworkBILink.StopDisrupt() {
-			return nil
+		if l, ok := r1.RouterLinks[r2.ID()]; ok {
+			if l.NetworkBILink.Disrupt() {
+				return nil
+			} else {
+				return errors.New("could not stop link")
+			}
 		} else {
 			return errors.New("could not stop link")
 		}

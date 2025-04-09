@@ -18,9 +18,16 @@ type dbConn struct {
 	ctx            context.Context
 	connectedNodes map[string]string
 	sync.Mutex
+	cost int
 }
 
 var conn *dbConn
+
+func SetCost(cost int) {
+	conn.Lock()
+	defer conn.Unlock()
+	conn.cost = cost
+}
 
 func StartConnection(uri string, user string, password string) {
 	ctx := context.Background()
@@ -38,7 +45,7 @@ func StartConnection(uri string, user string, password string) {
 		panic(err)
 	}
 
-	conn = &dbConn{uri, user, password, driver, ctx, make(map[string]string), sync.Mutex{}}
+	conn = &dbConn{uri, user, password, driver, ctx, make(map[string]string), sync.Mutex{}, 1000000}
 	err = prepareDatabase()
 	if err != nil {
 		panic(err)
@@ -198,24 +205,38 @@ func FindPathToRouter(src string, dest string) ([]string, int) {
 		return []string{src}, 0
 	}
 	result, err := query(
-		`MATCH (from:Node { id:$src }), (to:Node { id: $dest}) , path = (from)-[:COSTS*]-(to)
-		RETURN [ n in nodes(path) | n.id ] AS shortestPath,
-		reduce(weight = 0, r in relationships(path) | weight+r.weight) AS totalDistance
-		ORDER BY totalDistance ASC
-		LIMIT 1`,
-		map[string]any{
+		`MATCH (from:Node {id:$src}), (to:Node {id:$dest})
+CALL apoc.algo.dijkstra(from, to, 'COSTS', 'weight')
+YIELD path, weight
+WHERE weight <= $cost 
+RETURN [n in nodes(path) | n.id] AS shortestPath, toInteger(weight) AS totalDistance
+LIMIT 1`,
+		map[string]interface{}{
 			"src":  src,
 			"dest": dest,
+			"cost": conn.cost,
 		})
 
+	//	fmt.Printf(`MATCH (from:Node {id:"%s"}), (to:Node {id:"%s"})
+	//CALL apoc.algo.dijkstra(from, to, 'COSTS', 'weight')
+	//YIELD path, weight
+	//WHERE weight <= %d
+	//RETURN [n in nodes(path) | n.id] AS shortestPath, toInteger(weight) AS totalDistance
+	//LIMIT 1\n`, src, dest, 1000)
 	if err != nil {
 		fmt.Println(err)
 		return make([]string, 0), 0
 	}
 
+	//fmt.Println("QUERY:", result.Summary.Query())
+	//fmt.Println(result.Records)
+	//fmt.Println(result.Keys)
+	//fmt.Println(result.Summary)
 	if len(result.Records) == 0 {
+		fmt.Println("Found 0 results to router")
 		return make([]string, 0), 0
 	}
+
 	path := result.Records[0].AsMap()["shortestPath"].([]interface{})
 	distance := result.Records[0].AsMap()["totalDistance"].(int64)
 	newPath := make([]string, 0, len(path))

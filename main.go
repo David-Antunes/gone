@@ -55,6 +55,7 @@ func setEnvVariables() {
 	viper.SetDefault("GRAPHDB", "localhost")
 	viper.SetDefault("GRAPHDB_USER", "\"\"")
 	viper.SetDefault("GRAPHDB_PASSWORD", "\"\"")
+	viper.SetDefault("GRAPH_COST", 1000000)
 	viper.SetDefault("ID", "gone")
 	viper.SetDefault("PRIMARY", 0)
 	viper.SetDefault("PRIMARY_SERVER_IP", "192.168.1.1")
@@ -118,7 +119,7 @@ func main() {
 	// Configure emulation according if it is a local deployment or not
 	p := viper.GetInt("PRIMARY")
 	id := viper.GetString("ID")
-
+	graphDB.SetCost(viper.GetInt("GRAPH_COST"))
 	primaryAddr := viper.GetString("PRIMARY_SERVER_IP")
 	primaryPort := viper.GetString("PRIMARY_SERVER_PORT")
 	serverIP := viper.GetString("SERVER_IP")
