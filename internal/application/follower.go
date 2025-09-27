@@ -179,16 +179,16 @@ func (app *Follower) HandleNewMac(frame *xdp.Frame, routerId string) {
 		if net.HardwareAddr(dest).String() == path[len(path)-1] {
 			if internal.LocalQuery {
 				fmt.Println(routerId, ":", net.HardwareAddr(dest), ":", path[:2])
-				app.topo.InsertLocalPath(path[:2], frame, distance)
+				app.topo.InsertLocalPath(path[:2], frame.GetMacDestination(), distance)
 			} else {
 				fmt.Println(routerId, ":", net.HardwareAddr(dest), ":", path)
-				app.topo.InsertNewPath(path[:len(path)-1], frame, distance)
+				app.topo.InsertNewPath(path[:len(path)-1], frame.GetMacDestination(), distance)
 			}
 			r.NetworkRouter.InjectFrame(frame)
 		}
 	} else {
-		return
-		//app.topo.InsertNullPath(frame.MacDestination, routerId)
+		//return
+		app.topo.InsertNullPath(frame.MacDestination, routerId)
 	}
 }
 
@@ -2410,4 +2410,32 @@ func (app *Follower) StartRouter(id string) error {
 	} else {
 		return errors.New("invalid router id")
 	}
+}
+
+func (app *Follower) FillRoutes(id string) error {
+
+	if r, ok := app.topo.GetRouter(id); !ok {
+		return errors.New("invalid router id")
+	} else {
+		nodes := app.topo.GetNodes()
+
+		for _, node := range nodes {
+			mac := node.NetworkNode.GetMac()
+
+			path, distance := graphDB.FindPathToRouter(id, mac)
+
+			if len(path) > 0 {
+				if net.HardwareAddr(mac).String() == path[len(path)-1] {
+					if internal.LocalQuery {
+						fmt.Println(r.Id, ":", net.HardwareAddr(mac), ":", path[:2])
+						app.topo.InsertLocalPath(path[:2], mac, distance)
+					} else {
+						fmt.Println(r.Id, ":", net.HardwareAddr(mac), ":", path)
+						app.topo.InsertNewPath(path[:len(path)-1], mac, distance)
+					}
+				}
+			}
+		}
+	}
+	return nil
 }

@@ -51,6 +51,16 @@ func CreateTopology(machineId string, fl LocalFlowManager, delay *network.Dynami
 	}
 }
 
+func (topo *Topology) GetNodes() map[string]Node {
+	topo.Lock()
+	defer topo.Unlock()
+	nodes := make(map[string]Node)
+	for _, node := range topo.nodes {
+		nodes[node.Id] = *node
+	}
+	return nodes
+}
+
 func (topo *Topology) GetRouterNumber() int {
 	return len(topo.routers)
 }
@@ -368,7 +378,7 @@ func (topo *Topology) ConnectRouterToRouterLocal(router1 string, router2 string,
 	return link, nil
 }
 
-func (topo *Topology) InsertNewPath(path []string, frame *xdp.Frame, distance int) {
+func (topo *Topology) InsertNewPath(path []string, mac string, distance int) {
 	topo.Lock()
 	defer topo.Unlock()
 	currDistance := distance
@@ -377,7 +387,7 @@ func (topo *Topology) InsertNewPath(path []string, frame *xdp.Frame, distance in
 	for i := 1; i < len(path); i++ {
 		router2 := topo.routers[path[i]]
 		if router1.MachineId == topo.machineId {
-			currDistance = AddNewMacBetweenRouters(router1, router2, frame.GetMacDestination(), currDistance)
+			currDistance = AddNewMacBetweenRouters(router1, router2, mac, currDistance)
 			if currDistance < 0 {
 				fmt.Println("weight is negative!!!")
 			}
@@ -388,14 +398,14 @@ func (topo *Topology) InsertNewPath(path []string, frame *xdp.Frame, distance in
 	}
 }
 
-func (topo *Topology) InsertLocalPath(path []string, frame *xdp.Frame, distance int) {
+func (topo *Topology) InsertLocalPath(path []string, mac string, distance int) {
 	topo.Lock()
 	defer topo.Unlock()
 	currDistance := distance
 	router1 := topo.routers[path[0]]
 	router2 := topo.routers[path[1]]
 	if router1.MachineId == topo.machineId {
-		currDistance = AddNewMacBetweenRouters(router1, router2, frame.GetMacDestination(), currDistance)
+		currDistance = AddNewMacBetweenRouters(router1, router2, mac, currDistance)
 		if currDistance < 0 {
 			fmt.Println("weight is negative!!!")
 		}

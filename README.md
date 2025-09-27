@@ -146,6 +146,7 @@ To configure a simple network containing a bridge and 2 nodes, a client and a se
 ```
 
 * To create the network topology:
+
 ```bash
 ## Creates the iperf server
 gone-cli node -- docker run --rm -d --network gone_net --name server nicolaka/netshoot iperf -s
@@ -153,7 +154,7 @@ gone-cli node -- docker run --rm -d --network gone_net --name server nicolaka/ne
 ## Creates the iperf client
 gone-cli node -- docker run --rm -d --network gone_net --name client nicolaka/netshoot iperf -c server
 
-# Create a bridge
+## Create a bridge
 gone-cli bridge bridge1 
 
 ## Connects server and client to the same bridge with a default bandwidth of 10Mbits

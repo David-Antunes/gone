@@ -965,3 +965,38 @@ func stopRouter(w http.ResponseWriter, r *http.Request) {
 		Error:  apiErrors.Error{},
 	})
 }
+
+func fillRoutes(w http.ResponseWriter, r *http.Request) {
+
+	req := &opApi.FillRoutesRequest{}
+
+	if err := daemon.ParseRequest(r, req); err != nil {
+		daemonLog.Println("fillRoutes:", err)
+		daemon.SendError(w, &opApi.FillRoutesResponse{
+			Id: req.Id,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+
+	err := engine.app.FillRoutes(req.Id)
+
+	if err != nil {
+		daemonLog.Println("fillRoutes:", err)
+		daemon.SendError(w, &opApi.FillRoutesResponse{
+			Id: req.Id,
+			Error: apiErrors.Error{
+				ErrCode: 1,
+				ErrMsg:  err.Error(),
+			},
+		})
+		return
+	}
+	daemon.SendResponse(w, &opApi.FillRoutesResponse{
+		Id:    req.Id,
+		Error: apiErrors.Error{},
+	})
+}
